@@ -8,14 +8,12 @@
 #include "helpers.h"
 
 namespace luisa::compute::xir {
-
 struct TransformAdScope {
     Function *function{};
-    AutodiffScopeInst *ad_scope{};
+    AutodiffScope *ad_scope{};
     luisa::vector<BasicBlock *> ad_blocks{};
     luisa::vector<const Instruction *> requires_grads{};
     luisa::vector<const Instruction *> intermediate{};
-    void inline_all_callables() {}
     void locate_intermediates() {
     }
     void promote_intermediates() {
@@ -23,20 +21,18 @@ struct TransformAdScope {
     void generate_backward() {
     }
     void run() {
-        inline_all_callables();
         locate_intermediates();
         promote_intermediates();
         generate_backward();
     }
 };
-
 struct AutodiffPass {
     Function *function{};
     AutodiffOptions options{};
     auto locate_autodiff_scopes() {
         auto def = function->definition();
         auto dom = compute_dom_tree(def);
-        luisa::vector<std::pair<AutodiffScopeInst *, luisa::vector<BasicBlock *>>> ad_scopes;
+        luisa::vector<std::pair<AutodiffScope *, luisa::vector<BasicBlock *>>> ad_scopes;
         luisa::unordered_set<BasicBlock *> visited;
         def->traverse_basic_blocks([&](BasicBlock *block) {
             if (visited.contains(block)) {
@@ -44,8 +40,8 @@ struct AutodiffPass {
             }
             block->traverse_instructions([&](Instruction *inst) {
                 auto tag = inst->derived_instruction_tag();
-                if (tag == DerivedInstructionTag::AUTODIFF_SCOPE) {
-                    auto ad_scope = static_cast<AutodiffScopeInst *>(inst);
+                if (tag == DerivedInstructionTag::AUTO_DIFF) {
+                    auto ad_scope = static_cast<AutodiffScope *>(inst);
 
                     LUISA_INFO("Found autodiff scope: {}", ad_scope->name().value_or("unnamed"));
                     auto ad_blocks = luisa::vector<BasicBlock *>{};
@@ -70,16 +66,13 @@ struct AutodiffPass {
         }
     }
 };
-
-LC_XIR_API void autodiff_pass_run_on_function(Function *function, const AutodiffOptions &options) noexcept {
+[[nodiscard]] LC_XIR_API void autodiff_pass_run_on_function(Function *function, const AutodiffOptions &options) noexcept {
     AutodiffPass pass{function, options};
     pass.run();
 }
-
-LC_XIR_API void autodiff_pass_run_on_module(Module *module, const AutodiffOptions &options) noexcept {
-    for (auto &func : module->function_list()) {
+[[nodiscard]] LC_XIR_API void autodiff_pass_run_on_module(Module *module, const AutodiffOptions &options) noexcept {
+    for (auto &func : module->functions()) {
         autodiff_pass_run_on_function(&func, options);
     }
 }
-
 }// namespace luisa::compute::xir
