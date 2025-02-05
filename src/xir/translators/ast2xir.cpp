@@ -63,7 +63,7 @@ public:
 
 private:
     AST2XIRConfig _config;
-    Module *_module;
+    luisa::unique_ptr<Module> _module;
     luisa::unordered_map<uint64_t, Function *> _generated_functions;
     luisa::unordered_map<ConstantData, Constant *> _generated_constants;
     luisa::unordered_map<TypedLiteral, Constant *> _generated_literals;
@@ -257,18 +257,18 @@ private:
         return _translate_typed_literal(key);
     }
 
-    [[nodiscard]] static Value *_translate_builtin_variable(Variable ast_var) noexcept {
+    [[nodiscard]] Value *_translate_builtin_variable(Variable ast_var) noexcept {
         LUISA_ASSERT(ast_var.is_builtin(), "Unresolved variable reference.");
-        auto r = [tag = ast_var.tag()] {
+        auto r = [m = this->_module.get(), tag = ast_var.tag()]() noexcept -> SpecialRegister * {
             switch (tag) {
-                case Variable::Tag::THREAD_ID: return SpecialRegister::create(DerivedSpecialRegisterTag::THREAD_ID);
-                case Variable::Tag::BLOCK_ID: return SpecialRegister::create(DerivedSpecialRegisterTag::BLOCK_ID);
-                case Variable::Tag::DISPATCH_ID: return SpecialRegister::create(DerivedSpecialRegisterTag::DISPATCH_ID);
-                case Variable::Tag::DISPATCH_SIZE: return SpecialRegister::create(DerivedSpecialRegisterTag::DISPATCH_SIZE);
-                case Variable::Tag::KERNEL_ID: return SpecialRegister::create(DerivedSpecialRegisterTag::KERNEL_ID);
-                case Variable::Tag::WARP_LANE_COUNT: return SpecialRegister::create(DerivedSpecialRegisterTag::WARP_SIZE);
-                case Variable::Tag::WARP_LANE_ID: return SpecialRegister::create(DerivedSpecialRegisterTag::WARP_LANE_ID);
-                case Variable::Tag::OBJECT_ID: return SpecialRegister::create(DerivedSpecialRegisterTag::OBJECT_ID);
+                case Variable::Tag::THREAD_ID: return m->create_thread_id();
+                case Variable::Tag::BLOCK_ID: return m->create_block_id();
+                case Variable::Tag::DISPATCH_ID: return m->create_dispatch_id();
+                case Variable::Tag::DISPATCH_SIZE: return m->create_dispatch_size();
+                case Variable::Tag::KERNEL_ID: return m->create_kernel_id();
+                case Variable::Tag::WARP_LANE_COUNT: return m->create_warp_size();
+                case Variable::Tag::WARP_LANE_ID: return m->create_warp_lane_id();
+                case Variable::Tag::OBJECT_ID: return m->create_object_id();
                 default: break;
             }
             LUISA_ERROR_WITH_LOCATION("Unexpected variable type.");
@@ -975,10 +975,13 @@ private:
         _translate_statements(b, cdr);
     }
     void _translate_autodiff_stmt(Builder&b, const AutoDiffStmt*ast_autodiff) {
-        auto ad_block = Pool::current()->create<BasicBlock>();
-        b.set_insertion_point(ad_block);
+        auto ad_block = b.autodiff_scope();
+        auto entry = ad_block->create_entry_block();
+        b.set_insertion_point(entry);
         _translate_statements(b, ast_autodiff->body()->statements());
-        // TODO: add autodiff
+        auto merge = ad_block->create_merge_block();
+        b.br(merge);
+        b.set_insertion_point(merge);
     }
     void _translate_ray_query_stmt(Builder &b, const RayQueryStmt *ast_ray_query, luisa::span<const Statement *const> cdr) noexcept {
         // we do not support break/continue in ray query statement
@@ -1138,7 +1141,7 @@ private:
 
 public:
     explicit AST2XIRContext(const AST2XIRConfig &config) noexcept
-        : _config{config}, _module{Pool::current()->create<Module>()} {}
+        : _config{config}, _module{luisa::make_unique<Module>()} {}
 
     Function *add_function(const ASTFunction &f) noexcept {
         LUISA_ASSERT(_module != nullptr, "Module has been finalized.");
@@ -1177,9 +1180,8 @@ public:
         LUISA_NOT_IMPLEMENTED();
     }
 
-    [[nodiscard]] Module *finalize() noexcept {
-        auto module = std::exchange(_module, nullptr);
-        return module;
+    [[nodiscard]] luisa::unique_ptr<Module> finalize() noexcept {
+        return std::exchange(_module, nullptr);
     }
 };
 
@@ -1195,13 +1197,13 @@ void ast_to_xir_translate_add_external_function(AST2XIRContext *ctx, const ASTEx
     ctx->add_external_function(f);
 }
 
-Module *ast_to_xir_translate_finalize(AST2XIRContext *ctx) noexcept {
+luisa::unique_ptr<Module> ast_to_xir_translate_finalize(AST2XIRContext *ctx) noexcept {
     auto m = ctx->finalize();
     luisa::delete_with_allocator(ctx);
     return m;
 }
 
-Module *ast_to_xir_translate(const ASTFunction &kernel, const AST2XIRConfig &config) noexcept {
+luisa::unique_ptr<Module> ast_to_xir_translate(const ASTFunction &kernel, const AST2XIRConfig &config) noexcept {
     AST2XIRContext ctx{config};
     ctx.add_function(kernel);
     return ctx.finalize();
