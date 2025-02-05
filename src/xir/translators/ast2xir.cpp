@@ -974,7 +974,12 @@ private:
         b.set_insertion_point(merge_block);
         _translate_statements(b, cdr);
     }
-
+    void _translate_autodiff_stmt(Builder&b, const AutoDiffStmt*ast_autodiff) {
+        auto ad_block = Pool::current()->create<BasicBlock>();
+        b.set_insertion_point(ad_block);
+        _translate_statements(b, ast_autodiff->body()->statements());
+        // TODO: add autodiff
+    }
     void _translate_ray_query_stmt(Builder &b, const RayQueryStmt *ast_ray_query, luisa::span<const Statement *const> cdr) noexcept {
         // we do not support break/continue in ray query statement
         auto old_break_continue_target = std::exchange(_current.break_continue_target, {});
@@ -1072,7 +1077,10 @@ private:
                     auto ast_ray_query = static_cast<const RayQueryStmt *>(car);
                     return _translate_ray_query_stmt(b, ast_ray_query, cdr);
                 }
-                case Statement::Tag::AUTO_DIFF: LUISA_NOT_IMPLEMENTED();
+                case Statement::Tag::AUTO_DIFF:{
+                    auto ast_autodiff = static_cast<const AutoDiffStmt*>(car);
+                    return _translate_autodiff_stmt(b, ast_autodiff);
+                }
                 case Statement::Tag::PRINT: {
                     auto ast_print = static_cast<const PrintStmt *>(car);
                     luisa::fixed_vector<Value *, 16u> args;
