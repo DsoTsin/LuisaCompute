@@ -11,19 +11,7 @@ namespace luisa::compute::xir {
 struct TransformAdScope {
     Function *function{};
     AutodiffScope *ad_scope{};
-    luisa::vector<BasicBlock *> ad_blocks{};
-    luisa::vector<const Instruction *> requires_grads{};
-    luisa::vector<const Instruction *> intermediate{};
-    void locate_intermediates() {
-    }
-    void promote_intermediates() {
-    }
-    void generate_backward() {
-    }
     void run() {
-        locate_intermediates();
-        promote_intermediates();
-        generate_backward();
     }
 };
 struct AutodiffPass {
@@ -32,25 +20,15 @@ struct AutodiffPass {
     auto locate_autodiff_scopes() {
         auto def = function->definition();
         auto dom = compute_dom_tree(def);
-        luisa::vector<std::pair<AutodiffScope *, luisa::vector<BasicBlock *>>> ad_scopes;
-        luisa::unordered_set<BasicBlock *> visited;
-        def->traverse_basic_blocks([&](BasicBlock *block) {
-            if (visited.contains(block)) {
-                return;
-            }
-            block->traverse_instructions([&](Instruction *inst) {
-                auto tag = inst->derived_instruction_tag();
-                if (tag == DerivedInstructionTag::AUTO_DIFF) {
-                    auto ad_scope = static_cast<AutodiffScope *>(inst);
+        luisa::vector<AutodiffScope *> ad_scopes;
 
-                    LUISA_INFO("Found autodiff scope: {}", ad_scope->name().value_or("unnamed"));
-                    auto ad_blocks = luisa::vector<BasicBlock *>{};
-                    block->traverse_successors(false, [&](BasicBlock *succ) {
-                        ad_blocks.emplace_back(succ);
-                    });
-                }
-            });
-            visited.emplace(block);
+        def->traverse_instructions([&](Instruction *inst) {
+            auto tag = inst->derived_instruction_tag();
+            if (tag == DerivedInstructionTag::AUTO_DIFF) {
+                auto ad_scope = static_cast<AutodiffScope *>(inst);
+                ad_scopes.emplace_back(ad_scope);
+                LUISA_INFO("Found autodiff scope: {}", ad_scope->name().value_or("unnamed"));
+            }
         });
 
         return ad_scopes;
@@ -61,8 +39,8 @@ struct AutodiffPass {
         }
         auto scopes = locate_autodiff_scopes();
         for (auto scope : scopes) {
-            // TransformAdScope transform{function, scope};
-            // transform.run();
+            TransformAdScope transform{function, scope};
+            transform.run();
         }
     }
 };
