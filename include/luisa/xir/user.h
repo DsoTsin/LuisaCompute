@@ -12,12 +12,12 @@ private:
     luisa::vector<Use *> _operands;
 
 protected:
-    void _set_operand_use_value(Use *use, Value *value) const noexcept;
     [[nodiscard]] virtual bool _should_add_self_to_operand_use_lists() const noexcept = 0;
 
 public:
     using Value::Value;
     [[nodiscard]] bool is_user() const noexcept final { return true; }
+    static void set_operand_use_value(Use *use, Value *value) noexcept;
 
     void set_operand_count(size_t n) noexcept;
     void set_operand(size_t index, Value *value) noexcept;

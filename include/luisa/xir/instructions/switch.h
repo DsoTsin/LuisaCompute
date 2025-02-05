@@ -15,7 +15,7 @@ namespace luisa::compute::xir {
 // { merge_block }
 //
 // Note: this instruction must be the terminator of a basic block.
-class LC_XIR_API SwitchInst final : public ControlFlowMergeMixin<DerivedTerminatorInstruction<DerivedInstructionTag::SWITCH>> {
+class LC_XIR_API SwitchInst final : public ControlFlowMergeMixin<DerivedTerminatorInstruction<SwitchInst, DerivedInstructionTag::SWITCH>> {
 
 public:
     using case_value_type = int;
@@ -27,7 +27,7 @@ private:
     luisa::vector<case_value_type> _case_values;
 
 public:
-    explicit SwitchInst(Value *value = nullptr) noexcept;
+    SwitchInst(BasicBlock *parent_block, Value *value) noexcept;
 
     void set_value(Value *value) noexcept;
     void set_default_block(BasicBlock *block) noexcept;
@@ -59,7 +59,7 @@ public:
     [[nodiscard]] BasicBlock *default_block() noexcept;
     [[nodiscard]] const BasicBlock *default_block() const noexcept;
 
-    [[nodiscard]] SwitchInst *clone(InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] SwitchInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

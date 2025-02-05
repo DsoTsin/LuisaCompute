@@ -1,6 +1,7 @@
 #include <luisa/core/logging.h>
 #include <luisa/xir/function.h>
 #include <luisa/xir/module.h>
+#include <luisa/xir/undefined.h>
 #include <luisa/xir/builder.h>
 #include <luisa/xir/passes/dce.h>
 #include <luisa/xir/passes/lower_ray_query_loop.h>
@@ -34,8 +35,9 @@ static void collect_ray_query_loop_basic_blocks_post_order(BasicBlock *block, co
     LUISA_DEBUG_ASSERT(dispatch_block != nullptr, "Invalid ray query loop dispatch block.");
     // get query object from dispatch block
     auto dispatch_inst = dispatch_block->terminator();
-    LUISA_DEBUG_ASSERT(dispatch_inst != nullptr && dispatch_inst == &dispatch_block->instructions().front() &&
-                           dispatch_inst->derived_instruction_tag() == DerivedInstructionTag::RAY_QUERY_DISPATCH,
+    LUISA_DEBUG_ASSERT(dispatch_inst != nullptr &&
+                           dispatch_inst == &dispatch_block->instructions().front() &&
+                           dispatch_inst->isa<RayQueryDispatchInst>(),
                        "Invalid ray query loop dispatch instruction.");
     auto query_object = static_cast<RayQueryDispatchInst *>(dispatch_inst)->query_object();
     LUISA_DEBUG_ASSERT(query_object != nullptr, "Invalid ray query loop query object.");
@@ -152,17 +154,22 @@ public:
 };
 
 static BasicBlock *duplicate_basic_block_for_ray_query_loop_dispatch_branch(const BasicBlock *original, const BasicBlock *merge,
+                                                                            luisa::vector<std::pair<const PhiInst *, PhiInst *>> &phi_nodes,
                                                                             RayQueryLowerPassValueResolver &resolver) noexcept {
     auto bb = static_cast<BasicBlock *>(resolver.resolve(original));
     Builder b;
     b.set_insertion_point(bb);
     for (auto &&inst : original->instructions()) {
         // special case: branch to the merge block
-        if (inst.is_terminator() && inst.derived_instruction_tag() == DerivedInstructionTag::BRANCH &&
+        if (inst.is_terminator() && inst.isa<BranchInst>() &&
             static_cast<const BranchInst *>(&inst)->target_block() == merge) {
             b.return_void();
+        } else if (inst.isa<PhiInst>()) {
+            auto dup_phi = b.phi(inst.type());
+            phi_nodes.emplace_back(static_cast<const PhiInst *>(&inst), dup_phi);
+            resolver.emplace(&inst, dup_phi);
         } else {
-            auto dup_inst = duplicate_instruction(b, &inst, resolver);
+            auto dup_inst = inst.clone(b, resolver);
             LUISA_DEBUG_ASSERT(dup_inst != nullptr, "Failed to duplicate instruction.");
             resolver.emplace(&inst, dup_inst);
         }
@@ -183,14 +190,8 @@ static BasicBlock *duplicate_basic_block_for_ray_query_loop_dispatch_branch(cons
     RayQueryLoopSubgraph subgraph{.query_object = query_object};
     collect_ray_query_loop_basic_blocks_post_order(branch, dispatch, subgraph);
     std::reverse(subgraph.reverse_post_order.begin(), subgraph.reverse_post_order.end());
-    // check that the first block is the branch and the last block branches to the merge block
-    {
-        LUISA_DEBUG_ASSERT(subgraph.reverse_post_order.front() == branch, "Invalid branch block.");
-        auto terminator = subgraph.reverse_post_order.back()->terminator();
-        LUISA_DEBUG_ASSERT(terminator->derived_instruction_tag() == DerivedInstructionTag::BRANCH &&
-                               static_cast<BranchInst *>(terminator)->target_block() == dispatch,
-                           "Invalid branch terminator.");
-    }
+    // check that the first block is the branch
+    LUISA_DEBUG_ASSERT(subgraph.reverse_post_order.front() == branch, "Invalid branch block.");
     // value map for renaming
     RayQueryLowerPassValueResolver resolver;
     // create an argument for the query object
@@ -204,16 +205,17 @@ static BasicBlock *duplicate_basic_block_for_ray_query_loop_dispatch_branch(cons
     }
     // create blocks for the function
     for (auto block : subgraph.reverse_post_order) {
-        auto local_block = Pool::current()->create<BasicBlock>();
+        auto local_block = function->create_basic_block();
         resolver.emplace(block, local_block);
     }
     // set function body
     function->set_body_block(static_cast<BasicBlock *>(resolver.resolve(branch)));
     // duplicate the blocks
     auto already_returned = false;
+    luisa::vector<std::pair<const PhiInst *, PhiInst *>> phi_nodes;
     for (auto block : subgraph.reverse_post_order) {
-        if (auto bb = duplicate_basic_block_for_ray_query_loop_dispatch_branch(block, dispatch, resolver);
-            bb->terminator()->derived_instruction_tag() == DerivedInstructionTag::RETURN) {
+        if (auto bb = duplicate_basic_block_for_ray_query_loop_dispatch_branch(block, dispatch, phi_nodes, resolver);
+            bb->terminator()->isa<ReturnInst>()) {
             LUISA_ASSERT(!already_returned, "Multiple return instructions in the branch block.");
             already_returned = true;
             // generate store instructions for out values
@@ -227,6 +229,17 @@ static BasicBlock *duplicate_basic_block_for_ray_query_loop_dispatch_branch(cons
             }
         }
     }
+    // fix phi nodes
+    for (auto [original_phi, dup_phi] : phi_nodes) {
+        dup_phi->set_incoming_count(original_phi->incoming_count());
+        for (auto i = 0u; i < original_phi->incoming_count(); i++) {
+            auto incoming = original_phi->incoming(i);
+            auto resolved_value = resolver.resolve(incoming.value);
+            auto resolved_block = resolver.resolve(incoming.block);
+            LUISA_DEBUG_ASSERT(resolved_block->isa<BasicBlock>(), "Invalid resolved block.");
+            dup_phi->set_incoming(i, resolved_value, static_cast<BasicBlock *>(resolved_block));
+        }
+    }
     return function;
 }
 
@@ -236,13 +249,13 @@ static void lower_ray_query_loop(Function *function, RayQueryLoopInst *loop, Ray
     auto dispatch = static_cast<RayQueryDispatchInst *>(subgraph.reverse_post_order.front()->terminator());
     auto merge_block = loop->control_flow_merge()->merge_block();
     LUISA_DEBUG_ASSERT(dispatch->exit_block() == merge_block, "Invalid ray query loop exit block.");
-    LUISA_DEBUG_ASSERT(function->module() != nullptr, "Invalid function module.");
+    LUISA_DEBUG_ASSERT(function->parent_module() != nullptr, "Invalid function module.");
     auto on_surface = outline_ray_query_loop_dispatch_branch(
-        function->module(), dispatch->on_surface_candidate_block(), subgraph.query_object,
+        function->parent_module(), dispatch->on_surface_candidate_block(), subgraph.query_object,
         subgraph.reverse_post_order.front(), capture_list,
         "on_surface function outlined from ray query loop");
     auto on_procedural = outline_ray_query_loop_dispatch_branch(
-        function->module(), dispatch->on_procedural_candidate_block(), subgraph.query_object,
+        function->parent_module(), dispatch->on_procedural_candidate_block(), subgraph.query_object,
         subgraph.reverse_post_order.front(), capture_list,
         "on_procedural function outlined from ray query loop");
     // prepare captured arguments
@@ -257,6 +270,7 @@ static void lower_ray_query_loop(Function *function, RayQueryLoopInst *loop, Ray
         b.set_insertion_point(&function->definition()->body_block()->instructions().front());
         for (auto out_value : capture_list.out_values) {
             auto variable = b.alloca_local(out_value->type());
+            variable->add_comment("alloca for ray query output value");
             captured_args.emplace_back(variable);
         }
     }
@@ -270,6 +284,7 @@ static void lower_ray_query_loop(Function *function, RayQueryLoopInst *loop, Ray
         auto old_out_value = capture_list.out_values[i];
         auto out_variable = out_variables[i];
         auto out_value = b.load(old_out_value->type(), out_variable);
+        out_value->add_comment("load from ray query output alloca");
         old_out_value->replace_all_uses_with(out_value);
     }
     // remove the loop and move up instructions from the merge block
@@ -286,17 +301,125 @@ static void lower_ray_query_loop(Function *function, RayQueryLoopInst *loop, Ray
     info.lowered_loops.emplace(loop, pipeline);
 }
 
+static void collect_blocks_in_ray_query_dispatch_branch(BasicBlock *block, BasicBlock *dispatch_block,
+                                                        luisa::unordered_set<BasicBlock *> &collected) noexcept {
+    if (block != nullptr && block != dispatch_block && collected.emplace(block).second) {
+        block->traverse_successors(true, [&](BasicBlock *succ) noexcept {
+            collect_blocks_in_ray_query_dispatch_branch(succ, dispatch_block, collected);
+        });
+    }
+}
+
+static void replace_phi_uses_with_local_load_in_blocks(BasicBlock *block, PhiInst *phi, AllocaInst *phi_alloca,
+                                                       const luisa::unordered_set<BasicBlock *> &collected_blocks) noexcept {
+    if (block != nullptr) {
+        luisa::fixed_vector<Use *, 64u> local_uses;
+        for (auto &&use : phi->use_list()) {
+            if (auto user = use.user()) {
+                LUISA_DEBUG_ASSERT(user->isa<Instruction>(), "Invalid user.");
+                if (auto user_inst = static_cast<Instruction *>(user); collected_blocks.contains(user_inst->parent_block())) {
+                    local_uses.emplace_back(&use);
+                }
+            }
+        }
+        if (!local_uses.empty()) {
+            Builder b;
+            b.set_insertion_point(block->instructions().head_sentinel());
+            auto phi_load = b.load(phi->type(), phi_alloca);
+            phi_load->add_comment("load from phi alloca");
+            for (auto use : local_uses) {
+                User::set_operand_use_value(use, phi_load);
+            }
+        }
+    }
+}
+
+static void lower_phi_nodes_in_loop_dispatch_block(FunctionDefinition *f, RayQueryLoopInst *loop) noexcept {
+    auto dispatch_block = loop->dispatch_block();
+    LUISA_DEBUG_ASSERT(dispatch_block != nullptr, "Invalid dispatch block.");
+    // collect phi nodes
+    luisa::fixed_vector<PhiInst *, 16u> phi_nodes;
+    for (auto &&inst : dispatch_block->instructions()) {
+        switch (auto tag = inst.derived_instruction_tag()) {
+            case DerivedInstructionTag::RAY_QUERY_DISPATCH: {
+                LUISA_DEBUG_ASSERT(&inst == dispatch_block->terminator(),
+                                   "Invalid terminator.");
+                break;
+            }
+            case DerivedInstructionTag::PHI: {
+                phi_nodes.emplace_back(static_cast<PhiInst *>(&inst));
+                break;
+            }
+            default: LUISA_ERROR_WITH_LOCATION(
+                "Unexpected instruction {} in ray query loop dispatch block.",
+                xir::to_string(tag));
+        }
+    }
+    if (!phi_nodes.empty()) {
+        auto dispatch_inst = [&] {
+            auto terminator = dispatch_block->terminator();
+            LUISA_DEBUG_ASSERT(terminator->isa<RayQueryDispatchInst>(), "Invalid terminator.");
+            return static_cast<RayQueryDispatchInst *>(terminator);
+        }();
+        // collect surface and procedural blocks
+        auto surface_block = dispatch_inst->on_surface_candidate_block();
+        auto procedural_block = dispatch_inst->on_procedural_candidate_block();
+        luisa::unordered_set<BasicBlock *> surface_blocks;
+        luisa::unordered_set<BasicBlock *> procedural_blocks;
+        collect_blocks_in_ray_query_dispatch_branch(surface_block, dispatch_block, surface_blocks);
+        collect_blocks_in_ray_query_dispatch_branch(procedural_block, dispatch_block, procedural_blocks);
+        // lower the phi nodes to local variables
+        Builder b;
+        for (auto phi : phi_nodes) {
+            b.set_insertion_point(f->body_block()->instructions().head_sentinel());
+            auto phi_alloca = b.alloca_local(phi->type());
+            phi_alloca->add_comment("alloca to lower phi node in ray query loop");
+            static constexpr auto is_undef = [](Value *v) noexcept {
+                return v == nullptr || v->isa<Undefined>();
+            };
+            for (auto i = 0u; i < phi->incoming_count(); i++) {
+                if (auto incoming = phi->incoming(i); !is_undef(incoming.value)) {
+                    b.set_insertion_point(incoming.block->terminator()->prev());
+                    b.store(phi_alloca, incoming.value);
+                }
+            }
+            replace_phi_uses_with_local_load_in_blocks(surface_block, phi, phi_alloca, surface_blocks);
+            replace_phi_uses_with_local_load_in_blocks(procedural_block, phi, phi_alloca, procedural_blocks);
+#ifndef NDEBUG
+            for (auto &&use : phi->use_list()) {
+                if (auto user = use.user()) {
+                    LUISA_DEBUG_ASSERT(user->isa<Instruction>(), "Invalid user.");
+                    auto user_block = static_cast<Instruction *>(user)->parent_block();
+                    LUISA_DEBUG_ASSERT(!surface_blocks.contains(user_block) && !procedural_blocks.contains(user_block),
+                                       "Phi node uses should have been lowered in surface or procedural blocks.");
+                }
+            }
+#endif
+            if (auto exit_block = dispatch_inst->exit_block()) {
+                b.set_insertion_point(exit_block->instructions().head_sentinel());
+                auto phi_load = b.load(phi->type(), phi_alloca);
+                phi_load->add_comment("load from phi alloca in ray query exit block");
+                phi->replace_all_uses_with(phi_load);
+            }
+            LUISA_DEBUG_ASSERT(phi->use_list().empty(), "Phi node has uses but no exit block.");
+            phi->remove_self();
+        }
+    }
+}
+
 static void run_lower_ray_query_loop_pass_on_function(Function *function, RayQueryLoopLowerInfo &info) noexcept {
     if (auto def = function->definition()) {
         // discover all ray query loops
         luisa::vector<RayQueryLoopInst *> loops;
         def->traverse_instructions([&](Instruction *inst) noexcept {
-            if (inst->derived_instruction_tag() == DerivedInstructionTag::RAY_QUERY_LOOP) {
+            if (inst->isa<RayQueryLoopInst>()) {
                 loops.emplace_back(static_cast<RayQueryLoopInst *>(inst));
             }
         });
         // lower each ray query loop
         for (auto loop : loops) {
+            lower_phi_nodes_in_loop_dispatch_block(def, loop);
+            hoist_alloca_instructions_to_entry_block(def);
             lower_ray_query_loop(function, loop, info);
         }
         // remove dead code after lowering using the DCE pass
@@ -317,7 +440,7 @@ RayQueryLoopLowerInfo lower_ray_query_loop_pass_run_on_function(Function *functi
 
 RayQueryLoopLowerInfo lower_ray_query_loop_pass_run_on_module(Module *module) noexcept {
     RayQueryLoopLowerInfo info;
-    for (auto &&f : module->functions()) {
+    for (auto &&f : module->function_list()) {
         detail::run_lower_ray_query_loop_pass_on_function(&f, info);
     }
     return info;

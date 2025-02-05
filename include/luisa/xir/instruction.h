@@ -1,5 +1,6 @@
 #pragma once
 
+#include <luisa/core/concepts.h>
 #include <luisa/xir/user.h>
 
 namespace luisa::compute::xir {
@@ -50,7 +51,11 @@ enum struct DerivedInstructionTag {
     RAY_QUERY_DISPATCH,    // basic block terminator: ray query switch branches
     RAY_QUERY_OBJECT_READ, // read from ray query objects
     RAY_QUERY_OBJECT_WRITE,// write to ray query objects
-    RAY_QUERY_PIPELINE,
+    RAY_QUERY_PIPELINE,    // ray query pipeline with surface and procedural callbacks
+
+    /* automatic differentiation */
+    AUTODIFF_SCOPE,
+    AUTODIFF_INTRINSIC,
 
     /* other instructions */
     CALL, // user or external function calls
@@ -61,10 +66,7 @@ enum struct DerivedInstructionTag {
     ASSERT,// assertion
     ASSUME,// assumption
 
-    OUTLINE,  // mark that the body might be outlined (e.g., for faster compilation)
-    AUTO_DIFF,// automatic differentiation
-
-    INTRINSIC,// other intrinsics that are not yet promoted to dedicated instructions
+    OUTLINE,// mark that the body might be outlined (e.g., for faster compilation)
 };
 
 [[nodiscard]] constexpr luisa::string_view to_string(DerivedInstructionTag tag) noexcept {
@@ -104,8 +106,8 @@ enum struct DerivedInstructionTag {
         case DerivedInstructionTag::ASSERT: return "assert"sv;
         case DerivedInstructionTag::ASSUME: return "assume"sv;
         case DerivedInstructionTag::OUTLINE: return "outline"sv;
-        case DerivedInstructionTag::AUTO_DIFF: return "auto_diff"sv;
-        case DerivedInstructionTag::INTRINSIC: return "intrinsic"sv;
+        case DerivedInstructionTag::AUTODIFF_SCOPE: return "autodiff_scope"sv;
+        case DerivedInstructionTag::AUTODIFF_INTRINSIC: return "autodiff_intrinsic"sv;
     }
     return "unknown"sv;
 }
@@ -117,22 +119,19 @@ struct InstructionCloneValueResolver {
     [[nodiscard]] virtual Value *resolve(const Value *value) noexcept = 0;
 };
 
-class LC_XIR_API Instruction : public IntrusiveNode<Instruction, DerivedValue<DerivedValueTag::INSTRUCTION, User>> {
+class Builder;
 
-private:
-    friend BasicBlock;
-    BasicBlock *_parent_block = nullptr;
+class LC_XIR_API Instruction : public IntrusiveNode<Instruction, DerivedBlockScopeValue<Instruction, DerivedValueTag::INSTRUCTION, User>> {
 
 protected:
-    void _set_parent_block(BasicBlock *block) noexcept;
     void _remove_self_from_operand_use_lists() noexcept;
     void _add_self_to_operand_use_lists() noexcept;
     [[nodiscard]] bool _should_add_self_to_operand_use_lists() const noexcept override;
 
 public:
-    explicit Instruction(const Type *type = nullptr) noexcept;
+    explicit Instruction(BasicBlock *parent_block, const Type *type) noexcept;
     [[nodiscard]] virtual DerivedInstructionTag derived_instruction_tag() const noexcept = 0;
-    [[nodiscard]] virtual Instruction *clone(InstructionCloneValueResolver &resolver) const noexcept = 0;
+    [[nodiscard]] virtual Instruction *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept = 0;
 
     void remove_self() noexcept override;
     void insert_before_self(Instruction *node) noexcept override;
@@ -140,32 +139,28 @@ public:
     void replace_self_with(Instruction *node) noexcept;
 
     [[nodiscard]] virtual bool is_terminator() const noexcept { return false; }
-    [[nodiscard]] BasicBlock *parent_block() noexcept { return _parent_block; }
-    [[nodiscard]] const BasicBlock *parent_block() const noexcept { return _parent_block; }
 
     [[nodiscard]] virtual ControlFlowMerge *control_flow_merge() noexcept { return nullptr; }
     [[nodiscard]] const ControlFlowMerge *control_flow_merge() const noexcept;
+
+    LUISA_XIR_DEFINED_ISA_METHOD(Instruction, instruction)
 };
 
-class LC_XIR_API SentinelInst : public Instruction {
+class LC_XIR_API SentinelInst final : public Instruction {
 public:
-    SentinelInst() noexcept = default;
+    explicit SentinelInst(BasicBlock *parent_block) noexcept;
     [[nodiscard]] DerivedInstructionTag derived_instruction_tag() const noexcept override;
-    [[nodiscard]] Instruction *clone(InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] Instruction *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 using InstructionList = InlineIntrusiveList<Instruction, SentinelInst>;
 
-
 class LC_XIR_API TerminatorInstruction : public Instruction {
 public:
-    TerminatorInstruction() noexcept;
+    explicit TerminatorInstruction(BasicBlock *block) noexcept;
     [[nodiscard]] bool is_terminator() const noexcept final { return true; }
 };
-class LC_XIR_API AutodiffInstruction : public TerminatorInstruction {
-public:
-    AutodiffInstruction() noexcept;
-};
+
 // unconditional branch
 class LC_XIR_API BranchTerminatorInstruction : public TerminatorInstruction {
 
@@ -174,7 +169,7 @@ public:
     static constexpr size_t derived_operand_index_offset = 1u;
 
 public:
-    BranchTerminatorInstruction() noexcept;
+    explicit BranchTerminatorInstruction(BasicBlock *parent_block) noexcept;
 
     void set_target_block(BasicBlock *target) noexcept;
     BasicBlock *create_target_block(bool overwrite_existing = false) noexcept;
@@ -193,7 +188,8 @@ public:
     static constexpr size_t derived_operand_index_offset = 3u;
 
 public:
-    explicit ConditionalBranchTerminatorInstruction(Value *condition = nullptr) noexcept;
+    explicit ConditionalBranchTerminatorInstruction(BasicBlock *parent_block,
+                                                    Value *condition = nullptr) noexcept;
 
     void set_condition(Value *condition) noexcept;
     void set_true_target(BasicBlock *target) noexcept;
@@ -212,9 +208,12 @@ public:
     [[nodiscard]] const BasicBlock *false_block() const noexcept;
 };
 
-template<DerivedInstructionTag tag, typename Base = Instruction>
+template<typename Derived, DerivedInstructionTag tag, typename Base = Instruction>
+    requires std::derived_from<Base, Instruction>
 class DerivedInstruction : public Base {
 public:
+    using derived_instruction_type = Derived;
+    using Super = DerivedInstruction;
     using Base::Base;
 
     [[nodiscard]] static constexpr DerivedInstructionTag
@@ -226,30 +225,28 @@ public:
     }
 };
 
-template<DerivedInstructionTag tag>
-class DerivedTerminatorInstruction : public DerivedInstruction<tag, TerminatorInstruction> {
+template<typename Derived, DerivedInstructionTag tag>
+class DerivedTerminatorInstruction : public DerivedInstruction<Derived, tag, TerminatorInstruction> {
 public:
-    using DerivedInstruction<tag, TerminatorInstruction>::DerivedInstruction;
+    using Super = DerivedTerminatorInstruction;
+    using DerivedInstruction<Derived, tag, TerminatorInstruction>::DerivedInstruction;
 };
 
-template<DerivedInstructionTag tag>
-class DerivedBranchInstruction : public DerivedInstruction<tag, BranchTerminatorInstruction> {
+template<typename Derived, DerivedInstructionTag tag>
+class DerivedBranchInstruction : public DerivedInstruction<Derived, tag, BranchTerminatorInstruction> {
 public:
-    using DerivedInstruction<tag, BranchTerminatorInstruction>::DerivedInstruction;
+    using Super = DerivedBranchInstruction;
+    using DerivedInstruction<Derived, tag, BranchTerminatorInstruction>::DerivedInstruction;
 };
 
-template<DerivedInstructionTag tag>
-class DerivedConditionalBranchInstruction : public DerivedInstruction<tag, ConditionalBranchTerminatorInstruction> {
+template<typename Derived, DerivedInstructionTag tag>
+class DerivedConditionalBranchInstruction : public DerivedInstruction<Derived, tag, ConditionalBranchTerminatorInstruction> {
 public:
-    using DerivedInstruction<tag, ConditionalBranchTerminatorInstruction>::DerivedInstruction;
-};
-template<DerivedInstructionTag tag>
-class DerivedAutodiffInstruction : public DerivedInstruction<tag, AutodiffInstruction> {
-public:
-    using DerivedInstruction<tag, AutodiffInstruction>::DerivedInstruction;
+    using Super = DerivedConditionalBranchInstruction;
+    using DerivedInstruction<Derived, tag, ConditionalBranchTerminatorInstruction>::DerivedInstruction;
 };
 
-class LC_XIR_API ControlFlowMerge {
+class LC_XIR_API ControlFlowMerge : luisa::concepts::Noncopyable {
 
 private:
     BasicBlock *_merge_block{nullptr};
@@ -258,8 +255,11 @@ protected:
     ControlFlowMerge() noexcept = default;
     ~ControlFlowMerge() noexcept = default;
 
+private:
+    [[nodiscard]] virtual Instruction *_base_instruction() noexcept = 0;
+
 public:
-    void set_merge_block(BasicBlock *block) noexcept { _merge_block = block; }
+    void set_merge_block(BasicBlock *block) noexcept;
     [[nodiscard]] BasicBlock *merge_block() noexcept { return _merge_block; }
     [[nodiscard]] const BasicBlock *merge_block() const noexcept { return _merge_block; }
     BasicBlock *create_merge_block(bool overwrite_existing = false) noexcept;
@@ -269,11 +269,15 @@ template<typename Base>
     requires std::derived_from<Base, Instruction>
 class ControlFlowMergeMixin : public Base,
                               public ControlFlowMerge {
-public:
-    using Base::Base;
-    [[nodiscard]] ControlFlowMerge *control_flow_merge() noexcept final {
-        return this;
+private:
+    [[nodiscard]] Instruction *_base_instruction() noexcept final {
+        return static_cast<Instruction *>(this);
     }
+
+public:
+    using Super = ControlFlowMergeMixin;
+    using Base::Base;
+    [[nodiscard]] ControlFlowMerge *control_flow_merge() noexcept final { return this; }
 };
 
 template<typename OpType>

@@ -3,11 +3,7 @@
 
 namespace luisa::compute::xir {
 
-Argument::Argument(const Type *type, Function *parent_function) noexcept
-    : DerivedValue{type}, _parent_function{parent_function} {}
-
-void Argument::_set_parent_function(Function *func) noexcept {
-    _parent_function = func;
-}
+Argument::Argument(Function *parent_function, const Type *type) noexcept
+    : Super{parent_function, type} {}
 
 }// namespace luisa::compute::xir

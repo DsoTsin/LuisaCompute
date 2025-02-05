@@ -20,6 +20,7 @@ set(LUISA_COMPUTE_XIR_SOURCES
         instructions/assert.cpp
         instructions/assume.cpp
         instructions/atomic.cpp
+        instructions/autodiff.cpp
         instructions/branch.cpp
         instructions/break.cpp
         instructions/call.cpp
@@ -28,7 +29,6 @@ set(LUISA_COMPUTE_XIR_SOURCES
         instructions/continue.cpp
         instructions/gep.cpp
         instructions/if.cpp
-        instructions/intrinsic.cpp
         instructions/load.cpp
         instructions/loop.cpp
         instructions/op_name_map.cpp
@@ -69,6 +69,9 @@ set(LUISA_COMPUTE_XIR_SOURCES
         passes/lower_ray_query_loop.cpp
         passes/mem2reg.cpp
         passes/autodiff.cpp
+        passes/transpose_gep.cpp
+        passes/unused_callable_removal.cpp
+        passes/reg2mem.cpp
 )
 
 add_library(luisa-compute-xir SHARED ${LUISA_COMPUTE_XIR_SOURCES})

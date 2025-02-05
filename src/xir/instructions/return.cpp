@@ -1,8 +1,9 @@
+#include <luisa/xir/builder.h>
 #include <luisa/xir/instructions/return.h>
 
 namespace luisa::compute::xir {
 
-ReturnInst::ReturnInst(Value *value) noexcept {
+ReturnInst::ReturnInst(BasicBlock *parent_block, Value *value) noexcept : Super{parent_block} {
     set_operands(std::array{value});
 }
 
@@ -23,9 +24,9 @@ const Type *ReturnInst::return_type() const noexcept {
     return ret_value == nullptr ? nullptr : ret_value->type();
 }
 
-ReturnInst *ReturnInst::clone(InstructionCloneValueResolver &resolver) const noexcept {
+ReturnInst *ReturnInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_value = resolver.resolve(return_value());
-    return Pool::current()->create<ReturnInst>(resolved_value);
+    return b.return_(resolved_value);
 }
 
 }// namespace luisa::compute::xir

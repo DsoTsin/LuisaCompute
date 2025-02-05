@@ -1,9 +1,10 @@
+#include <luisa/xir/builder.h>
 #include <luisa/xir/instructions/assume.h>
 
 namespace luisa::compute::xir {
 
-AssumeInst::AssumeInst(Value *condition, luisa::string message) noexcept
-    : DerivedInstruction{nullptr}, _message{std::move(message)} {
+AssumeInst::AssumeInst(BasicBlock *parent_block, Value *condition, luisa::string message) noexcept
+    : Super{parent_block, nullptr}, _message{std::move(message)} {
     set_operands(std::array{condition});
 }
 
@@ -27,9 +28,9 @@ luisa::string_view AssumeInst::message() const noexcept {
     return _message;
 }
 
-AssumeInst *AssumeInst::clone(InstructionCloneValueResolver &resolver) const noexcept {
+AssumeInst *AssumeInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_cond = resolver.resolve(condition());
-    return Pool::current()->create<AssumeInst>(resolved_cond, _message);
+    return b.assume_(resolved_cond, _message);
 }
 
 }// namespace luisa::compute::xir

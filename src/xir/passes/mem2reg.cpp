@@ -3,6 +3,7 @@
 #include <luisa/xir/builder.h>
 #include <luisa/xir/undefined.h>
 #include <luisa/xir/passes/dom_tree.h>
+#include <luisa/xir/passes/transpose_gep.h>
 #include <luisa/xir/passes/mem2reg.h>
 
 #include "helpers.h"
@@ -17,7 +18,7 @@ namespace detail {
     // check if it's used as reference in other instructions than load/store
     for (auto &&use : inst->use_list()) {
         if (auto user = use.user()) {
-            LUISA_DEBUG_ASSERT(user->derived_value_tag() == DerivedValueTag::INSTRUCTION, "Invalid user.");
+            LUISA_DEBUG_ASSERT(user->isa<Instruction>(), "Invalid user.");
             switch (auto user_inst = static_cast<Instruction *>(user); user_inst->derived_instruction_tag()) {
                 case DerivedInstructionTag::LOAD: break;
                 case DerivedInstructionTag::STORE: break;
@@ -44,7 +45,7 @@ struct AllocaAnalysis {
         // find def and use blocks
         for (auto &&use : inst->use_list()) {
             if (auto user = use.user()) {
-                LUISA_DEBUG_ASSERT(user->derived_value_tag() == DerivedValueTag::INSTRUCTION, "Invalid user.");
+                LUISA_DEBUG_ASSERT(user->isa<Instruction>(), "Invalid user.");
                 switch (auto user_inst = static_cast<Instruction *>(user); user_inst->derived_instruction_tag()) {
                     case DerivedInstructionTag::LOAD: {
                         LUISA_DEBUG_ASSERT(user_inst->parent_block() != nullptr, "Invalid parent.");
@@ -104,7 +105,6 @@ struct PhiInsertionAndRenaming {
 
     // the following fields are used across the processing of different alloca's
     luisa::vector<PhiInst *> inserted;
-    luisa::unordered_map<const Type *, Undefined *> undefined_values;
 
     template<typename T>
     [[nodiscard]] Value *find_dom_value_for_use_block(BasicBlock *use_block, const Type *type,
@@ -125,15 +125,8 @@ struct PhiInsertionAndRenaming {
                 node = parent;
             }
         }
-        // not found, get a undef value
-        LUISA_WARNING_WITH_LOCATION("Detected usage of undefined local variables.");
-        return get_undefined_value(type);
-    }
-
-    [[nodiscard]] Undefined *get_undefined_value(const Type *type) noexcept {
-        auto iter = undefined_values.emplace(type, nullptr).first;
-        if (iter->second == nullptr) { iter->second = Undefined::create(type); }
-        return iter->second;
+        // not found, get an undef value
+        return use_block->parent_module()->create_undefined(type);
     }
 
     void place_phi_nodes(AllocaInst *inst, const AllocaAnalysis &analysis, Mem2RegInfo &info) noexcept {
@@ -181,7 +174,10 @@ struct PhiInsertionAndRenaming {
             }
         }
         // fill incomings of the phi nodes
-        for (auto [phi_block, phi_inst] : block_to_phi) {
+        for (auto mapping : block_to_phi) {
+            // earlier clang compilers have trouble with structural binding in lambda capture, so we manually unpack here
+            auto phi_block = mapping.first;
+            auto phi_inst = mapping.second;
             phi_block->traverse_predecessors(false, [&](BasicBlock *pred) noexcept {
                 auto dom_value = find_dom_value_for_use_block(pred, type, out_values, analysis);
                 phi_inst->add_incoming(dom_value, pred);
@@ -196,10 +192,17 @@ struct PhiInsertionAndRenaming {
     }
 
     void simplify_phi_nodes(Mem2RegInfo &info) noexcept {
-        for (auto phi : inserted) {
-            if (remove_redundant_phi_instruction(phi)) {
-                info.inserted_phi_instructions.erase(phi);
-            }
+        for (;;) {
+            auto prev_inserted_count = info.inserted_phi_instructions.size();
+            inserted.erase(std::remove_if(inserted.begin(), inserted.end(), [&](PhiInst *phi) noexcept {
+                               if (remove_redundant_phi_instruction(phi)) {
+                                   info.inserted_phi_instructions.erase(phi);
+                                   return true;
+                               }
+                               return false;
+                           }),
+                           inserted.end());
+            if (prev_inserted_count == info.inserted_phi_instructions.size()) { break; }
         }
     }
 };
@@ -215,10 +218,8 @@ static void simplify_single_block_store_load(AllocaInst *inst, AllocaStoreLoadSe
     seq.clear();
     for (auto &&use : inst->use_list()) {
         if (auto user = use.user()) {
-            LUISA_DEBUG_ASSERT(user->derived_value_tag() == DerivedValueTag::INSTRUCTION, "Invalid user.");
-            auto user_inst = static_cast<Instruction *>(user);
-            if (auto tag = user_inst->derived_instruction_tag();
-                tag == DerivedInstructionTag::LOAD || tag == DerivedInstructionTag::STORE) {
+            if (user->isa<LoadInst>() || user->isa<StoreInst>()) {
+                auto user_inst = static_cast<Instruction *>(user);
                 auto parent_block = user_inst->parent_block();
                 LUISA_DEBUG_ASSERT(parent_block != nullptr, "Invalid parent.");
                 seq[parent_block].emplace_back(user_inst);
@@ -267,18 +268,15 @@ static void simplify_single_block_store_load(AllocaInst *inst, AllocaStoreLoadSe
     // if we find the alloca now is stored to only, we can remove it
     auto all_store = true;
     for (auto &&use : inst->use_list()) {
-        if (auto user = use.user();
-            user != nullptr &&
-            static_cast<Instruction *>(user)->derived_instruction_tag() !=
-                DerivedInstructionTag::STORE) {
+        if (auto user = use.user(); user != nullptr && !user->isa<StoreInst>()) {
             all_store = false;
             break;
         }
     }
     if (all_store) {
         // remove all users
-        for (auto &&use : inst->use_list()) {
-            remove_store(static_cast<StoreInst *>(use.user()), info);
+        while (!inst->use_list().empty()) {
+            remove_store(static_cast<StoreInst *>(inst->use_list().front().user()), info);
         }
         // remove self
         remove_alloca(inst, info);
@@ -287,6 +285,14 @@ static void simplify_single_block_store_load(AllocaInst *inst, AllocaStoreLoadSe
 
 static void promote_alloca_instructions_in_function(Function *f, Mem2RegInfo &info) noexcept {
     if (auto def = f->definition()) {
+        // run the transpose GEP pass first so we can possibly handle more aggregates
+        if (auto transpose_gep_info = transpose_gep_pass_run_on_function(def);
+            !transpose_gep_info.transposed_load_instructions.empty() ||
+            !transpose_gep_info.transposed_store_instructions.empty()) {
+            LUISA_VERBOSE("Transposed {} load instruction(s) and {} store instruction(s) in mem2reg pass.",
+                          transpose_gep_info.transposed_load_instructions.size(),
+                          transpose_gep_info.transposed_store_instructions.size());
+        }
         // collect local alloca instructions that can be promoted
         luisa::vector<AllocaInst *> promotable;
         luisa::unordered_map<Instruction *, uint> inst_indices;
@@ -350,7 +356,7 @@ Mem2RegInfo mem2reg_pass_run_on_function(Function *function) noexcept {
 
 Mem2RegInfo mem2reg_pass_run_on_module(Module *module) noexcept {
     Mem2RegInfo info;
-    for (auto &&f : module->functions()) {
+    for (auto &&f : module->function_list()) {
         detail::promote_alloca_instructions_in_function(&f, info);
     }
     return info;

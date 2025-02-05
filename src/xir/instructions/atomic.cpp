@@ -1,12 +1,13 @@
 #include <luisa/core/logging.h>
+#include <luisa/xir/builder.h>
 #include <luisa/xir/instructions/atomic.h>
 
 namespace luisa::compute::xir {
 
-AtomicInst::AtomicInst(const Type *type, AtomicOp op,
+AtomicInst::AtomicInst(BasicBlock *parent_block, const Type *type, AtomicOp op,
                        Value *base, luisa::span<Value *const> indices,
                        luisa::span<Value *const> values) noexcept
-    : DerivedInstruction{type}, InstructionOpMixin{op} {
+    : Super{parent_block, type}, InstructionOpMixin{op} {
     auto expected_value_count = this->value_count();
     LUISA_DEBUG_ASSERT(values.empty() || values.size() == expected_value_count,
                        "Invalid number of values for atomic instruction.");
@@ -50,7 +51,7 @@ void AtomicInst::set_values(luisa::span<Value *const> values) noexcept {
     }
 }
 
-AtomicInst *AtomicInst::clone(InstructionCloneValueResolver &resolver) const noexcept {
+AtomicInst *AtomicInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_base = resolver.resolve(base());
     luisa::fixed_vector<Value *, 16u> resolved_indices;
     resolved_indices.reserve(index_count());
@@ -62,7 +63,7 @@ AtomicInst *AtomicInst::clone(InstructionCloneValueResolver &resolver) const noe
     for (auto value_use : value_uses()) {
         resolved_values.emplace_back(resolver.resolve(value_use->value()));
     }
-    return Pool::current()->create<AtomicInst>(type(), op(), resolved_base, resolved_indices, resolved_values);
+    return b.call(type(), op(), resolved_base, resolved_indices, resolved_values);
 }
 
 Use *AtomicInst::base_use() noexcept { return operand_use(0u); }

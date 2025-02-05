@@ -1,14 +1,12 @@
 #include <luisa/core/logging.h>
 #include <luisa/xir/basic_block.h>
+#include <luisa/xir/function.h>
 #include <luisa/xir/instruction.h>
 
 namespace luisa::compute::xir {
 
-Instruction::Instruction(const Type *type) noexcept : Super{type} {}
-
-void Instruction::_set_parent_block(BasicBlock *block) noexcept {
-    _parent_block = block;
-}
+Instruction::Instruction(BasicBlock *block, const Type *type) noexcept
+    : Super{block, type} {}
 
 bool Instruction::_should_add_self_to_operand_use_lists() const noexcept {
     return is_linked();
@@ -24,7 +22,7 @@ void Instruction::_add_self_to_operand_use_lists() noexcept {
     for (auto use : operand_uses()) {
         LUISA_DEBUG_ASSERT(!use->is_linked(), "Use already linked.");
         if (auto value = use->value()) {
-            value->use_list().insert_front(use);
+            use->add_to_list(value->use_list());
         }
     }
 }
@@ -32,19 +30,18 @@ void Instruction::_add_self_to_operand_use_lists() noexcept {
 void Instruction::remove_self() noexcept {
     Super::remove_self();
     _remove_self_from_operand_use_lists();
-    _set_parent_block(nullptr);
 }
 
 void Instruction::insert_before_self(Instruction *node) noexcept {
     Super::insert_before_self(node);
     node->_add_self_to_operand_use_lists();
-    node->_set_parent_block(_parent_block);
+    node->_set_parent_block(parent_block());
 }
 
 void Instruction::insert_after_self(Instruction *node) noexcept {
     Super::insert_after_self(node);
     node->_add_self_to_operand_use_lists();
-    node->_set_parent_block(_parent_block);
+    node->_set_parent_block(parent_block());
 }
 
 void Instruction::replace_self_with(Instruction *node) noexcept {
@@ -57,18 +54,20 @@ const ControlFlowMerge *Instruction::control_flow_merge() const noexcept {
     return const_cast<Instruction *>(this)->control_flow_merge();
 }
 
+SentinelInst::SentinelInst(BasicBlock *block) noexcept : Instruction{block, nullptr} {}
+
 DerivedInstructionTag SentinelInst::derived_instruction_tag() const noexcept {
     LUISA_ERROR_WITH_LOCATION("Calling SentinelInst::derived_instruction_tag()");
 }
 
-Instruction *SentinelInst::clone(InstructionCloneValueResolver &resolver) const noexcept {
+Instruction *SentinelInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
     LUISA_ERROR_WITH_LOCATION("Calling SentinelInst::clone()");
 }
 
-TerminatorInstruction::TerminatorInstruction() noexcept
-    : Instruction{nullptr} {}
+TerminatorInstruction::TerminatorInstruction(BasicBlock *block) noexcept
+    : Instruction{block, nullptr} {}
 
-BranchTerminatorInstruction::BranchTerminatorInstruction() noexcept {
+BranchTerminatorInstruction::BranchTerminatorInstruction(BasicBlock *block) noexcept : TerminatorInstruction{block} {
     auto operands = std::array{static_cast<Value *>(nullptr)};
     set_operands(operands);
 }
@@ -78,9 +77,8 @@ void BranchTerminatorInstruction::set_target_block(BasicBlock *target) noexcept 
 }
 
 BasicBlock *BranchTerminatorInstruction::create_target_block(bool overwrite_existing) noexcept {
-    LUISA_ASSERT(target_block() == nullptr || overwrite_existing,
-                 "Target block already exists.");
-    auto new_block = Pool::current()->create<BasicBlock>();
+    LUISA_ASSERT(target_block() == nullptr || overwrite_existing, "Target block already exists.");
+    auto new_block = parent_function()->create_basic_block();
     set_target_block(new_block);
     return new_block;
 }
@@ -93,7 +91,7 @@ const BasicBlock *BranchTerminatorInstruction::target_block() const noexcept {
     return const_cast<BranchTerminatorInstruction *>(this)->target_block();
 }
 
-ConditionalBranchTerminatorInstruction::ConditionalBranchTerminatorInstruction(Value *condition) noexcept {
+ConditionalBranchTerminatorInstruction::ConditionalBranchTerminatorInstruction(BasicBlock *block, Value *condition) noexcept : TerminatorInstruction{block} {
     auto operands = std::array{condition, static_cast<Value *>(nullptr), static_cast<Value *>(nullptr)};
     LUISA_DEBUG_ASSERT(operands[operand_index_condition] == condition, "Condition operand mismatch.");
     set_operands(operands);
@@ -112,17 +110,15 @@ void ConditionalBranchTerminatorInstruction::set_false_target(BasicBlock *target
 }
 
 BasicBlock *ConditionalBranchTerminatorInstruction::create_true_block(bool overwrite_existing) noexcept {
-    LUISA_ASSERT(true_block() == nullptr || overwrite_existing,
-                 "True block already exists.");
-    auto new_block = Pool::current()->create<BasicBlock>();
+    LUISA_ASSERT(true_block() == nullptr || overwrite_existing, "True block already exists.");
+    auto new_block = parent_function()->create_basic_block();
     set_true_target(new_block);
     return new_block;
 }
 
 BasicBlock *ConditionalBranchTerminatorInstruction::create_false_block(bool overwrite_existing) noexcept {
-    LUISA_ASSERT(false_block() == nullptr || overwrite_existing,
-                 "False block already exists.");
-    auto new_block = Pool::current()->create<BasicBlock>();
+    LUISA_ASSERT(false_block() == nullptr || overwrite_existing, "False block already exists.");
+    auto new_block = parent_function()->create_basic_block();
     set_false_target(new_block);
     return new_block;
 }
@@ -151,10 +147,17 @@ const BasicBlock *ConditionalBranchTerminatorInstruction::false_block() const no
     return const_cast<ConditionalBranchTerminatorInstruction *>(this)->false_block();
 }
 
+void ControlFlowMerge::set_merge_block(BasicBlock *block) noexcept {
+    auto base = _base_instruction();
+    LUISA_DEBUG_ASSERT(block == nullptr || (block->parent_function() == base->parent_function() &&
+                                            block->pool() == base->pool()),
+                       "Invalid merge block.");
+    _merge_block = block;
+}
+
 BasicBlock *ControlFlowMerge::create_merge_block(bool overwrite_existing) noexcept {
-    LUISA_ASSERT(merge_block() == nullptr || overwrite_existing,
-                 "Merge block already exists.");
-    auto block = Pool::current()->create<BasicBlock>();
+    LUISA_ASSERT(merge_block() == nullptr || overwrite_existing, "Merge block already exists.");
+    auto block = _base_instruction()->parent_function()->create_basic_block();
     set_merge_block(block);
     return block;
 }

@@ -385,7 +385,7 @@ private:
     }
 
     void _translate_module(const xir::Module *module) noexcept {
-        for (auto &f : module->functions()) {
+        for (auto &f : module->function_list()) {
             static_cast<void>(_translate_function(&f));
         }
     }
@@ -2584,25 +2584,6 @@ private:
         LUISA_ERROR_WITH_LOCATION("Unexpected arithmetic operation: {}.", xir::to_string(inst->op()));
     }
 
-    [[nodiscard]] llvm::Value *_translate_intrinsic_inst(CurrentFunction &current, IRBuilder &b, const xir::IntrinsicInst *inst) noexcept {
-        switch (inst->op()) {
-            case xir::IntrinsicOp::NOP: LUISA_ERROR_WITH_LOCATION("Unexpected NOP.");
-            case xir::IntrinsicOp::AUTODIFF_REQUIRES_GRADIENT: break;
-            case xir::IntrinsicOp::AUTODIFF_GRADIENT: break;
-            case xir::IntrinsicOp::AUTODIFF_GRADIENT_MARKER: break;
-            case xir::IntrinsicOp::AUTODIFF_ACCUMULATE_GRADIENT: break;
-            case xir::IntrinsicOp::AUTODIFF_BACKWARD: break;
-            case xir::IntrinsicOp::AUTODIFF_DETACH: break;
-        }
-        LUISA_INFO("unsupported intrinsic op type: {}", static_cast<int>(inst->op()));
-        LUISA_NOT_IMPLEMENTED();
-        // TODO: implement
-        if (auto llvm_ret_type = _translate_type(inst->type(), true)) {
-            return llvm::Constant::getNullValue(llvm_ret_type);
-        }
-        return nullptr;
-    }
-
     [[nodiscard]] llvm::Value *_translate_resource_query_inst(CurrentFunction &current, IRBuilder &b,
                                                               const xir::ResourceQueryInst *inst) noexcept {
         switch (inst->op()) {
@@ -2992,10 +2973,6 @@ private:
                 llvm_call->setCallingConv(llvm::CallingConv::Fast);
                 return llvm_call;
             }
-            case xir::DerivedInstructionTag::INTRINSIC: {
-                auto intrinsic_inst = static_cast<const xir::IntrinsicInst *>(inst);
-                return _translate_intrinsic_inst(current, b, intrinsic_inst);
-            }
             case xir::DerivedInstructionTag::ARITHMETIC: {
                 auto arithmetic_inst = static_cast<const xir::ArithmeticInst *>(inst);
                 return _translate_arithmetic_inst(current, b, arithmetic_inst);
@@ -3034,7 +3011,8 @@ private:
                 _translate_instructions_in_basic_block(current, llvm_merge_block, outline_inst->merge_block());
                 return llvm_inst;
             }
-            case xir::DerivedInstructionTag::AUTO_DIFF: LUISA_NOT_IMPLEMENTED();
+            case xir::DerivedInstructionTag::AUTODIFF_SCOPE: LUISA_ERROR_WITH_LOCATION("Unexpected autodiff_scope instruction. Run autodiff pass first.");
+            case xir::DerivedInstructionTag::AUTODIFF_INTRINSIC: LUISA_ERROR_WITH_LOCATION("Unexpected autodiff_intrinsic instruction. Run autodiff pass first.");
             case xir::DerivedInstructionTag::CLOCK: {
                 auto call = b.CreateIntrinsic(llvm::Intrinsic::readcyclecounter, {}, {});
                 auto llvm_result_type = _translate_type(inst->type(), true);

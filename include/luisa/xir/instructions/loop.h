@@ -5,7 +5,7 @@
 namespace luisa::compute::xir {
 
 // Note: this instruction must be the terminator of a basic block.
-class LC_XIR_API LoopInst final : public ControlFlowMergeMixin<DerivedTerminatorInstruction<DerivedInstructionTag::LOOP>> {
+class LC_XIR_API LoopInst final : public ControlFlowMergeMixin<DerivedTerminatorInstruction<LoopInst, DerivedInstructionTag::LOOP>> {
 
 public:
     static constexpr size_t operand_index_prepare_block = 0u;
@@ -15,7 +15,7 @@ private:
     BasicBlock *_update_block{nullptr};
 
 public:
-    LoopInst() noexcept;
+    explicit LoopInst(BasicBlock *parent_block) noexcept;
 
     void set_prepare_block(BasicBlock *block) noexcept;
     void set_body_block(BasicBlock *block) noexcept;
@@ -34,20 +34,20 @@ public:
     [[nodiscard]] BasicBlock *update_block() noexcept;
     [[nodiscard]] const BasicBlock *update_block() const noexcept;
 
-    [[nodiscard]] LoopInst *clone(InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] LoopInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
-class LC_XIR_API SimpleLoopInst final : public ControlFlowMergeMixin<DerivedTerminatorInstruction<DerivedInstructionTag::SIMPLE_LOOP>> {
+class LC_XIR_API SimpleLoopInst final : public ControlFlowMergeMixin<DerivedTerminatorInstruction<SimpleLoopInst, DerivedInstructionTag::SIMPLE_LOOP>> {
 public:
     static constexpr size_t operand_index_body_block = 0u;
 
 public:
-    SimpleLoopInst() noexcept;
+    explicit SimpleLoopInst(BasicBlock *parent_block) noexcept;
     void set_body_block(BasicBlock *block) noexcept;
     BasicBlock *create_body_block(bool overwrite_existing = false) noexcept;
     [[nodiscard]] BasicBlock *body_block() noexcept;
     [[nodiscard]] const BasicBlock *body_block() const noexcept;
-    [[nodiscard]] SimpleLoopInst *clone(InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] SimpleLoopInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

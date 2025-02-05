@@ -7,9 +7,9 @@ namespace luisa::compute::xir {
 enum class ArithmeticOp {
 
     // unary operators
-    UNARY_PLUS,     // +x
-    UNARY_MINUS,    // -x
-    UNARY_BIT_NOT,  // ~x
+    UNARY_PLUS,   // +x
+    UNARY_MINUS,  // -x
+    UNARY_BIT_NOT,// ~x
 
     // binary operators
     BINARY_ADD,
@@ -130,12 +130,13 @@ enum class ArithmeticOp {
 [[nodiscard]] LC_XIR_API luisa::string_view to_string(ArithmeticOp op) noexcept;
 [[nodiscard]] LC_XIR_API ArithmeticOp arithmetic_op_from_string(luisa::string_view name) noexcept;
 
-class LC_XIR_API ArithmeticInst final : public DerivedInstruction<DerivedInstructionTag::ARITHMETIC>,
+class LC_XIR_API ArithmeticInst final : public DerivedInstruction<ArithmeticInst, DerivedInstructionTag::ARITHMETIC>,
                                         public InstructionOpMixin<ArithmeticOp> {
 public:
-    explicit ArithmeticInst(const Type *type = nullptr, ArithmeticOp op = {},
-                            luisa::span<Value *const> operands = {}) noexcept;
-    [[nodiscard]] ArithmeticInst *clone(InstructionCloneValueResolver &resolver) const noexcept override;
+    ArithmeticInst(BasicBlock *parent_block,
+                   const Type *type, ArithmeticOp op,
+                   luisa::span<Value *const> operands = {}) noexcept;
+    [[nodiscard]] ArithmeticInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

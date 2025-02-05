@@ -4,7 +4,7 @@
 
 namespace luisa::compute::xir {
 
-class LC_XIR_API AssumeInst final : public DerivedInstruction<DerivedInstructionTag::ASSUME> {
+class LC_XIR_API AssumeInst final : public DerivedInstruction<AssumeInst, DerivedInstructionTag::ASSUME> {
 
 public:
     static constexpr size_t operand_index_condition = 0u;
@@ -13,8 +13,7 @@ private:
     luisa::string _message;
 
 public:
-    explicit AssumeInst(Value *condition = nullptr,
-                        luisa::string message = {}) noexcept;
+    AssumeInst(BasicBlock *parent_block, Value *condition, luisa::string message = {}) noexcept;
 
     void set_condition(Value *condition) noexcept;
     [[nodiscard]] Value *condition() noexcept;
@@ -23,8 +22,7 @@ public:
     void set_message(luisa::string_view message) noexcept;
     [[nodiscard]] luisa::string_view message() const noexcept;
 
-    [[nodiscard]] AssumeInst *clone(InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] AssumeInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir
-

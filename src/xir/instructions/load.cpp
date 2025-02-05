@@ -1,9 +1,10 @@
+#include <luisa/xir/builder.h>
 #include <luisa/xir/instructions/load.h>
 
 namespace luisa::compute::xir {
 
-LoadInst::LoadInst(const Type *type, Value *variable) noexcept
-    : DerivedInstruction{type} {
+LoadInst::LoadInst(BasicBlock *parent_block, const Type *type, Value *variable) noexcept
+    : Super{parent_block, type} {
     auto operands = std::array{variable};
     set_operands(operands);
 }
@@ -20,9 +21,9 @@ void LoadInst::set_variable(Value *variable) noexcept {
     return set_operand(0, variable);
 }
 
-LoadInst *LoadInst::clone(InstructionCloneValueResolver &resolver) const noexcept {
+LoadInst *LoadInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_variable = resolver.resolve(variable());
-    return Pool::current()->create<LoadInst>(type(), resolved_variable);
+    return b.load(type(), resolved_variable);
 }
 
 }// namespace luisa::compute::xir

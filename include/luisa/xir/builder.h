@@ -15,7 +15,7 @@
 #include <luisa/xir/instructions/continue.h>
 #include <luisa/xir/instructions/gep.h>
 #include <luisa/xir/instructions/if.h>
-#include <luisa/xir/instructions/intrinsic.h>
+#include <luisa/xir/instructions/autodiff.h>
 #include <luisa/xir/instructions/load.h>
 #include <luisa/xir/instructions/loop.h>
 #include <luisa/xir/instructions/outline.h>
@@ -31,13 +31,11 @@
 #include <luisa/xir/instructions/unreachable.h>
 
 namespace luisa::compute::xir {
-class ClockInst;
-}// namespace luisa::compute::xir
-namespace luisa::compute::xir {
 
 class LC_XIR_API Builder {
 
 private:
+    Pool *_pool = nullptr;
     Instruction *_insertion_point = nullptr;
 
 private:
@@ -45,7 +43,8 @@ private:
 
     template<typename T, typename... Args>
     [[nodiscard]] auto _create_and_append_instruction(Args &&...args) noexcept {
-        auto inst = Pool::current()->create<T>(std::forward<Args>(args)...);
+        _check_valid_insertion_point();
+        auto inst = _pool->create<T>(std::forward<Args>(args)...);
         append(inst);
         return inst;
     }
@@ -86,8 +85,8 @@ public:
     CallInst *call(const Type *type, Function *callee, luisa::span<Value *const> arguments) noexcept;
     CallInst *call(const Type *type, Function *callee, std::initializer_list<Value *> arguments) noexcept;
 
-    IntrinsicInst *call(const Type *type, IntrinsicOp op, luisa::span<Value *const> arguments) noexcept;
-    IntrinsicInst *call(const Type *type, IntrinsicOp op, std::initializer_list<Value *> arguments) noexcept;
+    AutodiffIntrinsicInst *call(const Type *type, AutodiffIntrinsicOp op, luisa::span<Value *const> arguments) noexcept;
+    AutodiffIntrinsicInst *call(const Type *type, AutodiffIntrinsicOp op, std::initializer_list<Value *> arguments) noexcept;
 
     AtomicInst *call(const Type *type, AtomicOp op, Value *base, luisa::span<Value *const> indices, luisa::span<Value *const> values) noexcept;
     AtomicInst *call(const Type *type, AtomicOp op, Value *base, luisa::span<Value *const> indices, std::initializer_list<Value *> values) noexcept;
@@ -106,6 +105,8 @@ public:
 
     ResourceWriteInst *call(ResourceWriteOp op, luisa::span<Value *const> operands) noexcept;
     ResourceWriteInst *call(ResourceWriteOp op, std::initializer_list<Value *> operands) noexcept;
+
+    CastInst *cast_(const Type *type, CastOp op, Value *value) noexcept;
 
     Instruction *static_cast_(const Type *type, Value *value) noexcept;
     CastInst *bit_cast_(const Type *type, Value *value) noexcept;
@@ -132,6 +133,8 @@ public:
     ClockInst *clock() noexcept;
 
     OutlineInst *outline() noexcept;
+
+    AutodiffScopeInst *autodiff_scope() noexcept;
 
     RayQueryLoopInst *ray_query_loop() noexcept;
     RayQueryDispatchInst *ray_query_dispatch(Value *query_object) noexcept;

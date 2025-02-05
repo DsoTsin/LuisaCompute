@@ -2,16 +2,16 @@
 
 namespace luisa::compute::xir {
 
-LocationMD::LocationMD(luisa::filesystem::path file, int line) noexcept
-    : _file{std::move(file)}, _line{line} {}
+LocationMD::LocationMD(Pool *pool, luisa::filesystem::path file, int line) noexcept
+    : Super{pool}, _file{std::move(file)}, _line{line} {}
 
 void LocationMD::set_location(luisa::filesystem::path file, int line) noexcept {
     set_file(std::move(file));
     set_line(line);
 }
 
-LocationMD *LocationMD::clone() const noexcept {
-    return Pool::current()->create<LocationMD>(file(), line());
+LocationMD *LocationMD::clone(Pool *pool) const noexcept {
+    return pool->create<LocationMD>(pool, file(), line());
 }
 
 }// namespace luisa::compute::xir

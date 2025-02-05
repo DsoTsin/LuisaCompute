@@ -32,12 +32,14 @@ enum struct DerivedSpecialRegisterTag {
     return "unknown"sv;
 }
 
-class LC_XIR_API SpecialRegister : public DerivedValue<DerivedValueTag::SPECIAL_REGISTER> {
+class LC_XIR_API SpecialRegister : public IntrusiveForwardNode<SpecialRegister, DerivedGlobalValue<SpecialRegister, DerivedValueTag::SPECIAL_REGISTER>> {
 public:
-    explicit SpecialRegister(const Type *type) noexcept : DerivedValue{type} {}
+    SpecialRegister(Module *module, const Type *type) noexcept : Super{module, type} {}
     [[nodiscard]] virtual DerivedSpecialRegisterTag derived_special_register_tag() const noexcept = 0;
-    [[nodiscard]] static SpecialRegister *create(DerivedSpecialRegisterTag tag) noexcept;
+    LUISA_XIR_DEFINED_ISA_METHOD(SpecialRegister, special_register)
 };
+
+using SpecialRegisterList = IntrusiveForwardList<SpecialRegister>;
 
 namespace detail {
 
@@ -58,17 +60,19 @@ template<typename T>
 }// namespace detail
 
 template<typename T, DerivedSpecialRegisterTag tag>
-class DerivedSpecialRegister : public SpecialRegister {
+class DerivedSpecialRegister final : public SpecialRegister {
 public:
-    DerivedSpecialRegister() noexcept : SpecialRegister{detail::get_special_register_type<T>()} {}
+    using derived_special_register_type = DerivedSpecialRegister;
+
+    explicit DerivedSpecialRegister(Module *module) noexcept
+        : SpecialRegister{module, detail::get_special_register_type<T>()} {}
+
     [[nodiscard]] static constexpr auto
     static_derived_special_register_tag() noexcept { return tag; }
+
     [[nodiscard]] DerivedSpecialRegisterTag
-    derived_special_register_tag() const noexcept final {
+    derived_special_register_tag() const noexcept override {
         return static_derived_special_register_tag();
-    }
-    [[nodiscard]] static auto create() noexcept {
-        return static_cast<DerivedSpecialRegister *>(SpecialRegister::create(tag));
     }
 };
 

@@ -7,7 +7,7 @@
 #include <luisa/xir/instructions/arithmetic.h>
 #include <luisa/xir/instructions/atomic.h>
 #include <luisa/xir/instructions/cast.h>
-#include <luisa/xir/instructions/intrinsic.h>
+#include <luisa/xir/instructions/autodiff.h>
 #include <luisa/xir/instructions/thread_group.h>
 #include <luisa/xir/instructions/ray_query.h>
 #include <luisa/xir/instructions/resource.h>
@@ -272,33 +272,31 @@ CastOp cast_op_from_string(luisa::string_view name) noexcept {
     return iter->second;
 }
 
-luisa::string_view to_string(IntrinsicOp op) noexcept {
+luisa::string_view to_string(AutodiffIntrinsicOp op) noexcept {
     using namespace std::string_view_literals;
     switch (op) {
-        case IntrinsicOp::NOP: return "nop"sv;
-        case IntrinsicOp::AUTODIFF_REQUIRES_GRADIENT: return "autodiff_requires_gradient"sv;
-        case IntrinsicOp::AUTODIFF_GRADIENT: return "autodiff_gradient"sv;
-        case IntrinsicOp::AUTODIFF_GRADIENT_MARKER: return "autodiff_gradient_marker"sv;
-        case IntrinsicOp::AUTODIFF_ACCUMULATE_GRADIENT: return "autodiff_accumulate_gradient"sv;
-        case IntrinsicOp::AUTODIFF_BACKWARD: return "autodiff_backward"sv;
-        case IntrinsicOp::AUTODIFF_DETACH: return "autodiff_detach"sv;
+        case AutodiffIntrinsicOp::AUTODIFF_REQUIRES_GRADIENT: return "autodiff_requires_gradient"sv;
+        case AutodiffIntrinsicOp::AUTODIFF_GRADIENT: return "autodiff_gradient"sv;
+        case AutodiffIntrinsicOp::AUTODIFF_GRADIENT_MARKER: return "autodiff_gradient_marker"sv;
+        case AutodiffIntrinsicOp::AUTODIFF_ACCUMULATE_GRADIENT: return "autodiff_accumulate_gradient"sv;
+        case AutodiffIntrinsicOp::AUTODIFF_BACKWARD: return "autodiff_backward"sv;
+        case AutodiffIntrinsicOp::AUTODIFF_DETACH: return "autodiff_detach"sv;
     }
-    LUISA_ERROR_WITH_LOCATION("Unknown intrinsic operation (code = {}).", static_cast<uint32_t>(op));
+    LUISA_ERROR_WITH_LOCATION("Unknown autodiff operation (code = {}).", static_cast<uint32_t>(op));
 }
 
-IntrinsicOp intrinsic_op_from_string(luisa::string_view name) noexcept {
+AutodiffIntrinsicOp autodiff_intrinsic_op_from_string(luisa::string_view name) noexcept {
     using namespace std::string_view_literals;
-    static const luisa::unordered_map<luisa::string_view, IntrinsicOp> m{
-        {"nop"sv, IntrinsicOp::NOP},
-        {"autodiff_requires_gradient"sv, IntrinsicOp::AUTODIFF_REQUIRES_GRADIENT},
-        {"autodiff_gradient"sv, IntrinsicOp::AUTODIFF_GRADIENT},
-        {"autodiff_gradient_marker"sv, IntrinsicOp::AUTODIFF_GRADIENT_MARKER},
-        {"autodiff_accumulate_gradient"sv, IntrinsicOp::AUTODIFF_ACCUMULATE_GRADIENT},
-        {"autodiff_backward"sv, IntrinsicOp::AUTODIFF_BACKWARD},
-        {"autodiff_detach"sv, IntrinsicOp::AUTODIFF_DETACH},
+    static const luisa::unordered_map<luisa::string_view, AutodiffIntrinsicOp> m{
+        {"autodiff_requires_gradient"sv, AutodiffIntrinsicOp::AUTODIFF_REQUIRES_GRADIENT},
+        {"autodiff_gradient"sv, AutodiffIntrinsicOp::AUTODIFF_GRADIENT},
+        {"autodiff_gradient_marker"sv, AutodiffIntrinsicOp::AUTODIFF_GRADIENT_MARKER},
+        {"autodiff_accumulate_gradient"sv, AutodiffIntrinsicOp::AUTODIFF_ACCUMULATE_GRADIENT},
+        {"autodiff_backward"sv, AutodiffIntrinsicOp::AUTODIFF_BACKWARD},
+        {"autodiff_detach"sv, AutodiffIntrinsicOp::AUTODIFF_DETACH},
     };
     auto iter = m.find(name);
-    LUISA_ASSERT(iter != m.end(), "Unknown intrinsic operation: {}.", name);
+    LUISA_ASSERT(iter != m.end(), "Unknown autodiff_intrinsic operation: {}.", name);
     return iter->second;
 }
 

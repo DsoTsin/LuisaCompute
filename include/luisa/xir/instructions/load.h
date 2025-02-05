@@ -4,14 +4,13 @@
 
 namespace luisa::compute::xir {
 
-class LC_XIR_API LoadInst final : public DerivedInstruction<DerivedInstructionTag::LOAD> {
+class LC_XIR_API LoadInst final : public DerivedInstruction<LoadInst, DerivedInstructionTag::LOAD> {
 public:
-    explicit LoadInst(const Type *type = nullptr,
-                      Value *variable = nullptr) noexcept;
+    LoadInst(BasicBlock *parent_block, const Type *type, Value *variable) noexcept;
     [[nodiscard]] Value *variable() noexcept;
     [[nodiscard]] const Value *variable() const noexcept;
     void set_variable(Value *variable) noexcept;
-    [[nodiscard]] LoadInst *clone(InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] LoadInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

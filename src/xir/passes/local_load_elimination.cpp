@@ -100,7 +100,7 @@ LocalLoadEliminationInfo local_load_elimination_pass_run_on_function(Function *f
 
 LocalLoadEliminationInfo local_load_elimination_pass_run_on_module(Module *module) noexcept {
     LocalLoadEliminationInfo info;
-    for (auto &&f : module->functions()) {
+    for (auto &&f : module->function_list()) {
         detail::run_local_load_elimination_on_function(&f, info);
     }
     return info;

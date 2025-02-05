@@ -27,7 +27,6 @@
 #include <luisa/xir/passes/dce.h>
 #include <luisa/xir/passes/local_store_forward.h>
 #include <luisa/xir/passes/local_load_elimination.h>
-#include <luisa/xir/passes/trace_gep.h>
 #include <luisa/xir/passes/mem2reg.h>
 #include <luisa/xir/passes/lower_ray_query_loop.h>
 
@@ -183,8 +182,6 @@ FallbackShader::FallbackShader(FallbackDevice *device, const ShaderOption &optio
     _build_bound_arguments(kernel.bound_arguments());
 
     Clock translate_clk;
-    xir::Pool pool;
-    xir::PoolGuard guard{&pool};
     auto xir_module = xir::ast_to_xir_translate(kernel, {});
     xir_module->set_name(luisa::format("kernel_{:016x}", kernel.hash()));
     if (!option.name.empty()) { xir_module->set_location(option.name); }
@@ -194,28 +191,30 @@ FallbackShader::FallbackShader(FallbackDevice *device, const ShaderOption &optio
     if (LUISA_SHOULD_DUMP_XIR) {
         auto filename = luisa::format("kernel.{:016x}.xir", kernel.hash());
         std::ofstream f{filename.c_str()};
-        f << xir::xir_to_text_translate(xir_module, true);
+        f << xir::xir_to_text_translate(xir_module.get(), true);
     }
 
     // run some simple optimization passes on XIR to reduce the size of LLVM IR
     Clock opt_clk;
-    auto dce1_info = xir::dce_pass_run_on_module(xir_module);
-    auto gep_trace_info = xir::trace_gep_pass_run_on_module(xir_module);
-    auto store_forward_info = xir::local_store_forward_pass_run_on_module(xir_module);
-    auto load_elim_info = xir::local_load_elimination_pass_run_on_module(xir_module);
-    auto dce2_info = xir::dce_pass_run_on_module(xir_module);
-    auto mem2reg_info = xir::mem2reg_pass_run_on_module(xir_module);
-    auto dce3_info = xir::dce_pass_run_on_module(xir_module);
-    auto rq_lower_info = xir::lower_ray_query_loop_pass_run_on_module(xir_module);
+    auto dce1_info = xir::dce_pass_run_on_module(xir_module.get());
+    auto store_forward_info = xir::local_store_forward_pass_run_on_module(xir_module.get());
+    auto load_elim_info = xir::local_load_elimination_pass_run_on_module(xir_module.get());
+    auto dce2_info = xir::dce_pass_run_on_module(xir_module.get());
+    auto mem2reg_info = xir::mem2reg_pass_run_on_module(xir_module.get());
+    auto dce3_info = xir::dce_pass_run_on_module(xir_module.get());
+    if (LUISA_SHOULD_DUMP_XIR) {
+        auto filename = luisa::format("kernel.{:016x}.opt.xir", kernel.hash());
+        std::ofstream f{filename.c_str()};
+        f << xir::xir_to_text_translate(xir_module.get(), true);
+    }
+    auto rq_lower_info = xir::lower_ray_query_loop_pass_run_on_module(xir_module.get());
     LUISA_VERBOSE("XIR optimization done in {} ms: "
-                  "traced {} GEP instruction(s), "
                   "forwarded {} store instruction(s), "
                   "eliminated {} load instruction(s), "
                   "promoted {} alloca instruction(s) with {} load and {} store instruction(s) removed and {} phi node(s) inserted, "
                   "removed {} + {} + {} = {} dead instruction(s), "
                   "lowered {} ray query loop(s).",
                   opt_clk.toc(),
-                  gep_trace_info.traced_geps.size(),
                   store_forward_info.forwarded_instructions.size(),
                   load_elim_info.eliminated_instructions.size(),
                   mem2reg_info.promoted_alloca_instructions.size(), mem2reg_info.removed_load_instructions.size(), mem2reg_info.removed_store_instructions.size(), mem2reg_info.inserted_phi_instructions.size(),
@@ -225,9 +224,9 @@ FallbackShader::FallbackShader(FallbackDevice *device, const ShaderOption &optio
 
     // dump for debugging
     if (LUISA_SHOULD_DUMP_XIR) {
-        auto filename = luisa::format("kernel.{:016x}.opt.xir", kernel.hash());
+        auto filename = luisa::format("kernel.{:016x}.opt.rq.xir", kernel.hash());
         std::ofstream f{filename.c_str()};
-        f << xir::xir_to_text_translate(xir_module, true);
+        f << xir::xir_to_text_translate(xir_module.get(), true);
     }
 
     auto llvm_ctx = std::make_unique<llvm::LLVMContext>();
@@ -240,7 +239,7 @@ FallbackShader::FallbackShader(FallbackDevice *device, const ShaderOption &optio
     }
 
     Clock codegen_clk;
-    auto codegen_feedback = luisa_fallback_backend_codegen(*llvm_ctx, llvm_module.get(), xir_module);
+    auto codegen_feedback = luisa_fallback_backend_codegen(*llvm_ctx, llvm_module.get(), xir_module.get());
     LUISA_VERBOSE("XIR to LLVM IR code generation done in {} ms.", codegen_clk.toc());
 
     if (llvm::verifyModule(*llvm_module, &llvm::errs())) {

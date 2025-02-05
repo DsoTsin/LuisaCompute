@@ -1,10 +1,11 @@
+#include <luisa/xir/builder.h>
 #include <luisa/xir/instructions/gep.h>
 
 namespace luisa::compute::xir {
 
-GEPInst::GEPInst(const Type *type, Value *base,
-                 luisa::span<Value *const> indices) noexcept
-    : DerivedInstruction{type} {
+GEPInst::GEPInst(BasicBlock *parent_block, const Type *type,
+                 Value *base, luisa::span<Value *const> indices) noexcept
+    : Super{parent_block, type} {
     set_operand_count(1u + indices.size());
     set_operand(operand_index_base, base);
     for (size_t i = 0u; i < indices.size(); ++i) {
@@ -39,14 +40,14 @@ void GEPInst::remove_index(size_t i) noexcept {
     remove_operand(operand_index_index_offset + i);
 }
 
-GEPInst *GEPInst::clone(InstructionCloneValueResolver &resolver) const noexcept {
+GEPInst *GEPInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_base = resolver.resolve(base());
     luisa::fixed_vector<Value *, 16u> resolved_indices;
     resolved_indices.reserve(index_count());
     for (auto index_use : index_uses()) {
         resolved_indices.emplace_back(resolver.resolve(index_use->value()));
     }
-    return Pool::current()->create<GEPInst>(type(), resolved_base, resolved_indices);
+    return b.gep(type(), resolved_base, resolved_indices);
 }
 
 }// namespace luisa::compute::xir

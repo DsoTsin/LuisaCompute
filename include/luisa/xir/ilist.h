@@ -172,9 +172,9 @@ private:
     Node *_tail_sentinel = nullptr;
 
 public:
-    IntrusiveList() noexcept {
-        _head_sentinel = Pool::current()->create<SentinelNode>();
-        _tail_sentinel = Pool::current()->create<SentinelNode>();
+    explicit IntrusiveList(Pool *pool) noexcept {
+        _head_sentinel = pool->create<SentinelNode>();
+        _tail_sentinel = pool->create<SentinelNode>();
         _head_sentinel->_next = _tail_sentinel;
         _tail_sentinel->_prev = _head_sentinel;
     }
@@ -194,7 +194,9 @@ private:
     SentinelNode _tail_sentinel;
 
 public:
-    InlineIntrusiveList() noexcept {
+    template<typename... Args>
+    explicit InlineIntrusiveList(Args... args) noexcept
+        : _head_sentinel{args...}, _tail_sentinel{args...} {
         _head_sentinel._next = &_tail_sentinel;
         _tail_sentinel._prev = &_head_sentinel;
     }

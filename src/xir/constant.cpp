@@ -1,32 +1,12 @@
 #include <luisa/core/stl/hash.h>
 #include <luisa/core/logging.h>
 #include <luisa/ast/type_registry.h>
+#include <luisa/xir/module.h>
 #include <luisa/xir/constant.h>
 
+#include <utility>
+
 namespace luisa::compute::xir {
-
-Constant::Constant(const Type *type, const void *data) noexcept
-    : Super{type} {
-    LUISA_ASSERT(type != nullptr, "Constant type must be specified.");
-    if (!_is_small()) {
-        _large = luisa::allocate_with_allocator<std::byte>(type->size());
-    }
-    set_data(data);
-}
-
-Constant::~Constant() noexcept {
-    if (!_is_small()) {
-        luisa::deallocate_with_allocator(static_cast<std::byte *>(_large));
-    }
-}
-
-bool Constant::_is_small() const noexcept {
-    return type()->size() <= sizeof(void *);
-}
-
-void Constant::_error_cannot_change_type() const noexcept {
-    LUISA_ERROR_WITH_LOCATION("Constant type cannot be changed.");
-}
 
 namespace detail {
 
@@ -163,37 +143,69 @@ static void xir_constant_fill_one(const Type *t, void *data) noexcept {
 
 }// namespace detail
 
-void Constant::set_data(const void *data) noexcept {
-    memset(this->data(), 0, type()->size());
-    if (data != nullptr) { detail::xir_constant_fill_data(type(), data, this->data()); }
-    _update_hash();
-}
-
-void *Constant::data() noexcept {
+void *Constant::_data() noexcept {
     return _is_small() ? _small : _large;
-}
-
-const void *Constant::data() const noexcept {
-    return const_cast<Constant *>(this)->data();
-}
-
-void Constant::set_zero() noexcept {
-    set_data(nullptr);
-}
-
-void Constant::set_one() noexcept {
-    memset(this->data(), 0, type()->size());
-    detail::xir_constant_fill_one(type(), this->data());
-    _update_hash();
 }
 
 void Constant::_check_reinterpret_cast_type_size(size_t size) const noexcept {
     LUISA_ASSERT(type()->size() == size, "Type size mismatch.");
 }
 
-void Constant::_update_hash() noexcept {
-    auto hv = luisa::hash64(this->data(), type()->size(), luisa::hash64_default_seed);
-    _hash = luisa::hash_combine({type()->hash(), hv});
+void Constant::_update_hash(luisa::optional<uint64_t> hash) noexcept {
+    static constexpr auto compute = [](const Type *type, const void *data) noexcept {
+        auto hv = luisa::hash64(data, type->size(), luisa::hash64_default_seed);
+        return luisa::hash_combine({type->hash(), hv});
+    };
+    if (hash.has_value()) {
+        LUISA_DEBUG_ASSERT(compute(type(), _data()) == hash.value(), "Hash mismatch.");
+        _hash = hash.value();
+    } else {
+        _hash = compute(type(), _data());
+    }
+}
+
+Constant::Constant(Module *module, const Type *type) noexcept
+    : Super{module, type} {
+    LUISA_DEBUG_ASSERT(type != nullptr && !type->is_custom() && !type->is_resource(),
+                       "Invalid constant type: {}.", type == nullptr ? "void" : type->description());
+    if (!_is_small()) { _large = luisa::allocate_with_allocator<std::byte>(type->size()); }
+}
+
+bool Constant::_is_small() const noexcept {
+    return type()->size() <= sizeof(void *);
+}
+
+Constant::Constant(Module *module, const Type *type, const void *data,
+                   luisa::optional<uint64_t> hash) noexcept
+    : Constant{module, type} {
+    LUISA_DEBUG_ASSERT(data != nullptr, "Data must not be null.");
+    detail::xir_constant_fill_data(type, data, _data());
+    _update_hash(std::move(hash));
+}
+
+Constant::Constant(Module *module, const Type *type, ctor_tag_zero,
+                   luisa::optional<uint64_t> hash) noexcept
+    : Constant{module, type} {
+    std::memset(_data(), 0, type->size());
+    _update_hash(std::move(hash));
+}
+
+Constant::Constant(Module *module, const Type *type, ctor_tag_one,
+                   luisa::optional<uint64_t> hash) noexcept
+    : Constant{module, type} {
+    std::memset(_data(), 0, type->size());
+    detail::xir_constant_fill_one(type, _data());
+    _update_hash(std::move(hash));
+}
+
+const void *Constant::data() const noexcept {
+    return const_cast<Constant *>(this)->_data();
+}
+
+Constant::~Constant() noexcept {
+    if (!_is_small()) {
+        luisa::deallocate_with_allocator(static_cast<std::byte *>(_large));
+    }
 }
 
 }// namespace luisa::compute::xir

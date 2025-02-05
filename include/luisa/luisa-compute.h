@@ -210,6 +210,7 @@
 #include <luisa/xir/instructions/assert.h>
 #include <luisa/xir/instructions/assume.h>
 #include <luisa/xir/instructions/atomic.h>
+#include <luisa/xir/instructions/autodiff.h>
 #include <luisa/xir/instructions/branch.h>
 #include <luisa/xir/instructions/break.h>
 #include <luisa/xir/instructions/call.h>
@@ -218,7 +219,6 @@
 #include <luisa/xir/instructions/continue.h>
 #include <luisa/xir/instructions/gep.h>
 #include <luisa/xir/instructions/if.h>
-#include <luisa/xir/instructions/intrinsic.h>
 #include <luisa/xir/instructions/load.h>
 #include <luisa/xir/instructions/loop.h>
 #include <luisa/xir/instructions/outline.h>
@@ -238,6 +238,7 @@
 #include <luisa/xir/metadata/name.h>
 #include <luisa/xir/module.h>
 #include <luisa/xir/passes/aggregate_field_bitmask.h>
+#include <luisa/xir/passes/autodiff.h>
 #include <luisa/xir/passes/dce.h>
 #include <luisa/xir/passes/dom_tree.h>
 #include <luisa/xir/passes/local_load_elimination.h>
@@ -246,8 +247,11 @@
 #include <luisa/xir/passes/mem2reg.h>
 #include <luisa/xir/passes/outline.h>
 #include <luisa/xir/passes/pointer_usage.h>
+#include <luisa/xir/passes/reg2mem.h>
 #include <luisa/xir/passes/sroa.h>
 #include <luisa/xir/passes/trace_gep.h>
+#include <luisa/xir/passes/transpose_gep.h>
+#include <luisa/xir/passes/unused_callable_removal.h>
 #include <luisa/xir/pool.h>
 #include <luisa/xir/special_register.h>
 #include <luisa/xir/translators/ast2xir.h>

@@ -19,7 +19,7 @@
 #include <luisa/xir/instructions/clock.h>
 #include <luisa/xir/instructions/continue.h>
 #include <luisa/xir/instructions/gep.h>
-#include <luisa/xir/instructions/intrinsic.h>
+#include <luisa/xir/instructions/autodiff.h>
 #include <luisa/xir/instructions/load.h>
 #include <luisa/xir/instructions/loop.h>
 #include <luisa/xir/instructions/outline.h>
@@ -131,10 +131,10 @@ private:
     }
 
     void _traverse_values_in_module(const Module *module) noexcept {
-        for (auto &c : module->constants()) {
+        for (auto &c : module->constant_list()) {
             static_cast<void>(_value_uid(&c));
         }
-        for (auto &f : module->functions()) {
+        for (auto &f : module->function_list()) {
             static_cast<void>(_value_uid(&f));
             _traverse_values_in_function(&f);
         }
@@ -419,7 +419,7 @@ private:
         _emit_operands(inst);
     }
 
-    void _emit_intrinsic_inst(const IntrinsicInst *inst) noexcept {
+    void _emit_autodiff_intrinsic_inst(const AutodiffIntrinsicInst *inst) noexcept {
         _main << "@" << to_string(inst->op());
         if (!inst->operand_uses().empty()) {
             _main << " ";
@@ -528,9 +528,6 @@ private:
             case DerivedInstructionTag::CALL:
                 _emit_call_inst(static_cast<const CallInst *>(inst));
                 break;
-            case DerivedInstructionTag::INTRINSIC:
-                _emit_intrinsic_inst(static_cast<const IntrinsicInst *>(inst));
-                break;
             case DerivedInstructionTag::CAST:
                 _emit_cast_inst(static_cast<const CastInst *>(inst));
                 break;
@@ -540,7 +537,10 @@ private:
             case DerivedInstructionTag::OUTLINE:
                 _emit_outline_inst(static_cast<const OutlineInst *>(inst), indent);
                 break;
-            case DerivedInstructionTag::AUTO_DIFF: LUISA_NOT_IMPLEMENTED();
+            case DerivedInstructionTag::AUTODIFF_SCOPE: LUISA_NOT_IMPLEMENTED();
+            case DerivedInstructionTag::AUTODIFF_INTRINSIC:
+                _emit_autodiff_intrinsic_inst(static_cast<const AutodiffIntrinsicInst *>(inst));
+                break;
             case DerivedInstructionTag::RAY_QUERY_LOOP:
                 _emit_ray_query_loop_inst(static_cast<const RayQueryLoopInst *>(inst), indent);
                 break;
@@ -765,8 +765,8 @@ private:
             _prelude << "\n";
         }
         _prelude << "module;\n\n";// TODO: metadata
-        for (auto &c : module->constants()) { _emit_constant(&c); }
-        for (auto &f : module->functions()) { _emit_function(&f); }
+        for (auto &c : module->constant_list()) { _emit_constant(&c); }
+        for (auto &f : module->function_list()) { _emit_function(&f); }
     }
 
     static void _emit_name_metadata(StringScratch &s, const NameMD &m) noexcept {
@@ -784,7 +784,8 @@ private:
         _emit_string_escaped(s, m.comment());
     }
 
-    static void _emit_metadata_list(StringScratch &s, const MetadataList &m) noexcept {
+    template<typename T>
+    static void _emit_metadata_list(StringScratch &s, const T &m) noexcept {
         s << "[";
         for (auto &item : m) {
             switch (item.derived_metadata_tag()) {

@@ -9,8 +9,8 @@ OutlineInfo outline_pass_run_on_function(Module *module, Function *function) noe
 OutlineInfo outline_pass_run_on_module(Module *module) noexcept {
     OutlineInfo info;
     luisa::vector<Function *> functions;
-    for (auto &f : module->functions()) { functions.emplace_back(&f); }
-    for (auto &f : module->functions()) {
+    for (auto &f : module->function_list()) { functions.emplace_back(&f); }
+    for (auto &f : module->function_list()) {
         auto func_info = outline_pass_run_on_function(module, &f);
     }
     return info;

@@ -1,13 +1,14 @@
 #include <luisa/ast/type_registry.h>
+#include <luisa/xir/builder.h>
 #include <luisa/xir/instructions/clock.h>
 
 namespace luisa::compute::xir {
 
-ClockInst::ClockInst() noexcept
-    : DerivedInstruction{Type::of<luisa::ulong>()} {}
+ClockInst::ClockInst(BasicBlock *parent_block) noexcept
+    : Super{parent_block, Type::of<luisa::ulong>()} {}
 
-ClockInst *ClockInst::clone(InstructionCloneValueResolver &resolver) const noexcept {
-    return Pool::current()->create<ClockInst>();
+ClockInst *ClockInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+    return b.clock();
 }
 
 }// namespace luisa::compute::xir

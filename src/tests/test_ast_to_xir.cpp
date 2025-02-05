@@ -153,14 +153,11 @@ int main() {
         seed_image.write(coord, make_uint4(seed));
     };
 
-    xir::Pool pool;
-    xir::PoolGuard guard{&pool};
-
     auto module = xir::ast_to_xir_translate(render_kernel.function()->function(), {});
-    auto text = xir::xir_to_text_translate(module, true);
+    auto text = xir::xir_to_text_translate(module.get(), true);
 
     LUISA_INFO("AST2IR:\n{}", text);
 
-    auto json = xir::xir_to_json_translate(module);
+    auto json = xir::xir_to_json_translate(module.get());
     LUISA_INFO("IR2JSON:\n{}", json);
 }

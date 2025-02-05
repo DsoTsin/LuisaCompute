@@ -2,8 +2,7 @@
 
 namespace luisa::compute::xir {
 
-Undefined *Undefined::create(const Type *type) noexcept {
-    return Pool::current()->create<Undefined>(type);
-}
+Undefined::Undefined(Module *module, const Type *type) noexcept
+    : Super{module, type} {}
 
 }// namespace luisa::compute::xir

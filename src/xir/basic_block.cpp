@@ -48,11 +48,8 @@ void BasicBlock::_do_traverse_successors(bool exclude_self, void *ctx, void (*vi
     }
 }
 
-BasicBlock::BasicBlock() noexcept
-    : DerivedValue{nullptr} {
-    _instructions.head_sentinel()->_set_parent_block(this);
-    _instructions.tail_sentinel()->_set_parent_block(this);
-}
+BasicBlock::BasicBlock(Function *function) noexcept
+    : Super{function, nullptr}, _instructions{this} {}
 
 bool BasicBlock::is_terminated() const noexcept {
     return _instructions.back().is_terminator();

@@ -5,17 +5,17 @@
 
 namespace luisa::compute::xir {
 
-class LC_XIR_API PrintInst final : public DerivedInstruction<DerivedInstructionTag::PRINT> {
+class LC_XIR_API PrintInst final : public DerivedInstruction<PrintInst, DerivedInstructionTag::PRINT> {
 
 private:
     luisa::string _format;
 
 public:
-    explicit PrintInst(luisa::string format = {},
+    explicit PrintInst(BasicBlock *parent_block, luisa::string format = {},
                        luisa::span<Value *const> operands = {}) noexcept;
     [[nodiscard]] auto format() const noexcept { return luisa::string_view{_format}; }
     void set_format(luisa::string_view format) noexcept { _format = format; }
-    [[nodiscard]] PrintInst *clone(InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] PrintInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

@@ -8,7 +8,7 @@ class Function;
 class Instruction;
 class User;
 
-class LC_XIR_API BasicBlock : public DerivedValue<DerivedValueTag::BASIC_BLOCK> {
+class LC_XIR_API BasicBlock final : public DerivedFunctionScopeValue<BasicBlock, DerivedValueTag::BASIC_BLOCK> {
 
 private:
     InstructionList _instructions;
@@ -18,7 +18,8 @@ private:
     void _do_traverse_successors(bool exclude_self, void *ctx, void (*visit)(void *, BasicBlock *)) noexcept;
 
 public:
-    BasicBlock() noexcept;
+    explicit BasicBlock(Function *parent_function) noexcept;
+
     [[nodiscard]] auto &instructions() noexcept { return _instructions; }
     [[nodiscard]] auto &instructions() const noexcept { return _instructions; }
 
