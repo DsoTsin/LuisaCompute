@@ -3,6 +3,12 @@ enable_custom_malloc = get_config("enable_custom_malloc")
 table.insert(_config_rules, "lc-rename-ext")
 local rename_rule_idx = table.getn(_config_rules)
 includes("ext/EASTL", "ext/spdlog", "ext/reproc", "ext/liblmdb", "ext/volk", "ext/stb")
+
+-- TODO: yyJSON to be removed
+-------------------------------
+add_requires("yyjson")
+--------------------------------
+
 table.remove(_config_rules, rename_rule_idx)
 includes("core", "vstl", "ast", "runtime")
 if get_config("enable_osl") then
@@ -32,6 +38,9 @@ if get_config("enable_api") then
 end
 if get_config("enable_clangcxx") then
     includes("clangcxx")
+end
+if get_config("enable_xir") then
+    includes("xir")
 end
 
 add_requires("zlib >=1.2.8-skr", {

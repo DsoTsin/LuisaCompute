@@ -56,6 +56,13 @@ set_values(true, false)
 set_default(true)
 set_showmenu(true)
 option_end()
+-- enable fallback backend (embree+llvm)
+option("fallback_backend")
+set_values(true, false)
+set_default(false)
+set_showmenu(true)
+option_end()
+
 -- enable NVIDIA-CUDA Extension CUB
 option("cuda_ext_lcub")
 set_values(true, false)
@@ -101,6 +108,16 @@ set_values(true, false)
 set_default(false)
 set_showmenu(true)
 option_end()
+
+--------------------------------
+option("enable_xir")
+set_values(true, false)
+set_default(false)
+set_showmenu(true)
+option_end()
+--------------------------------
+
+
 -- enable osl
 option("enable_osl")
 set_values(true, false)
@@ -152,10 +169,17 @@ set_values(true, false)
 set_default(false)
 set_showmenu(true)
 option_end()
+
 option("llvm_path")
 set_default(false)
 set_showmenu(true)
 option_end()
+
+option("fallback_llvm_path") -- Currenct Require LLVM 19.1.7
+set_default(false)
+set_showmenu(true)
+option_end()
+
 -- pre-defined options end
 
 -- use xrepo from skr

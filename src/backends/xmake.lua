@@ -21,6 +21,11 @@ includes("validation")
 if get_config("toy_c_backend") then
     includes("toy_c")    
 end
+
+if get_config("fallback_backend") then
+    includes("fallback")
+end
+
 target("lc-backends-dummy")
 set_kind("phony")
 on_load(function(target)
@@ -57,6 +62,11 @@ on_load(function(target)
     end
     if get_config("cpu_backend") then
         target:add("deps", "lc-backend-cpu", {
+            inherit = false
+        })
+    end
+    if get_config("fallback_backend") then
+        target:add("deps", "lc-backend-fallback", {
             inherit = false
         })
     end

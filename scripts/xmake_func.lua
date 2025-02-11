@@ -236,7 +236,10 @@ on_load(function(target)
 
     local force_optimize = _get_or("force_optimize", nil)
     if is_mode("debug") then
-        target:set("runtimes", _get_or("runtime", "MDd"), {
+        -- target:set("runtimes", _get_or("runtime", "MDd"), {
+        --     public = true
+        -- })
+        target:set("runtimes", _get_or("runtime", "MTd"), {
             public = true
         })
         if force_optimize then
@@ -250,7 +253,10 @@ on_load(function(target)
             public = true
         })
     elseif is_mode("releasedbg") then
-        target:set("runtimes", _get_or("runtime", "MDd"), {
+        -- target:set("runtimes", _get_or("runtime", "MDd"), {
+        --     public = true
+        -- })
+        target:set("runtimes", _get_or("runtime", "MTd"), {
             public = true
         })
         if force_optimize then
@@ -264,9 +270,14 @@ on_load(function(target)
             public = true
         })
     else
-        target:set("runtimes", _get_or("runtime", "MD"), {
+        -- target:set("runtimes", _get_or("runtime", "MD"), {
+        --     public = true
+        -- })
+
+        target:set("runtimes", _get_or("runtime", "MT"), {
             public = true
         })
+ 
         target:set("optimize", "aggressive")
         target:set("warnings", "none")
         target:add("cxflags", "/GS-", "/Gd", {

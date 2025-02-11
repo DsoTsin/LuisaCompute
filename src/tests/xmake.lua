@@ -84,6 +84,9 @@ local function test_proj(name, gui_dep, callable)
         add_deps("lc-ir")
         add_deps("lc-rust")
     end
+    if get_config("enable_xir") then 
+        add_deps("lc-xir")
+    end
     if get_config("enable_gui") then
         add_deps("lc-gui")
     end
@@ -101,6 +104,12 @@ if get_config("enable_ir") then
     test_proj('test_autodiff')
     test_proj('test_autodiff_full')
 end
+
+if get_config("enable_xir") then 
+    test_proj("test_ast_to_xir")
+    test_proj("test_xir_builder")
+end 
+
 test_proj("test_helloworld")
 test_proj("test_ast")
 test_proj("test_atomic")
@@ -278,3 +287,4 @@ if get_config("dx_backend") and enable_fsr3 then
         end)
     end)
 end
+
