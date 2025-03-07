@@ -7,7 +7,6 @@ function(luisa_compute_add_backend name)
     add_library(luisa-compute-backend-${name} MODULE ${BACKEND_SOURCES})
     target_link_libraries(luisa-compute-backend-${name} PRIVATE
             luisa-compute-ast
-            luisa-compute-vstl
             luisa-compute-runtime
             luisa-compute-gui)
     if (LUISA_COMPUTE_ENABLE_DSL)
@@ -57,6 +56,10 @@ if (LUISA_COMPUTE_ENABLE_RUST)
     if (LUISA_COMPUTE_ENABLE_REMOTE)
         add_subdirectory(remote)
     endif ()
+endif ()
+
+if (LUISA_COMPUTE_ENABLE_FALLBACK)
+    add_subdirectory(fallback)
 endif ()
 
 install(TARGETS luisa-compute-backends

@@ -60,6 +60,11 @@ inline void unreachable(luisa::string_view msg) noexcept {
     detail::FunctionBuilder::current()->call(CallOp::UNREACHABLE, {message});
 }
 
+inline ULong device_clock() noexcept {
+    return def<ulong>(detail::FunctionBuilder::current()->call(
+        Type::of<ulong>(), CallOp::CLOCK, {}));
+}
+
 /// Call assert in device code
 inline void device_assert(Expr<bool> pred) noexcept {
     detail::FunctionBuilder::current()->call(
@@ -72,7 +77,7 @@ inline void device_assert(Expr<bool> pred, luisa::string_view msg) noexcept {
 }
 
 /// Get thread_id(uint3)
-[[nodiscard]] inline auto thread_id() noexcept {
+[[nodiscard]] inline const auto thread_id() noexcept {
     return def<uint3>(detail::FunctionBuilder::current()->thread_id());
 }
 
@@ -92,7 +97,7 @@ inline void device_assert(Expr<bool> pred, luisa::string_view msg) noexcept {
 }
 
 /// Get block_id(uint3)
-[[nodiscard]] inline auto block_id() noexcept {
+[[nodiscard]] inline const auto block_id() noexcept {
     return def<uint3>(detail::FunctionBuilder::current()->block_id());
 }
 
@@ -112,7 +117,7 @@ inline void device_assert(Expr<bool> pred, luisa::string_view msg) noexcept {
 }
 
 /// Get dispatch_id(uint3)
-[[nodiscard]] inline auto dispatch_id() noexcept {
+[[nodiscard]] inline const auto dispatch_id() noexcept {
     return def<uint3>(detail::FunctionBuilder::current()->dispatch_id());
 }
 [[nodiscard]] inline auto object_id() noexcept {
@@ -143,7 +148,7 @@ inline void device_assert(Expr<bool> pred, luisa::string_view msg) noexcept {
 }
 
 /// Get dispatch size(uint3)
-[[nodiscard]] inline auto dispatch_size() noexcept {
+[[nodiscard]] inline const auto dispatch_size() noexcept {
     return def<uint3>(detail::FunctionBuilder::current()->dispatch_size());
 }
 
@@ -163,7 +168,7 @@ inline void device_assert(Expr<bool> pred, luisa::string_view msg) noexcept {
 }
 
 /// Get block size(uint3)
-[[nodiscard]] inline auto block_size() noexcept {
+[[nodiscard]] inline const auto block_size() noexcept {
     return detail::FunctionBuilder::current()->block_size();
 }
 
@@ -195,6 +200,10 @@ inline void set_block_size(uint3 size) noexcept {
 
 inline void set_block_size(uint2 size) noexcept {
     set_block_size(size.x, size.y, 1u);
+}
+
+inline void set_name(luisa::string_view name) noexcept {
+    detail::FunctionBuilder::current()->set_name(name);
 }
 
 inline void require_curve_basis(CurveBasis basis) noexcept {
@@ -2003,7 +2012,7 @@ void Local<T>::backward() const noexcept {
 }
 
 template<typename T>
-void Local<T>::backward(const Local<T> grad) const noexcept {
+void Local<T>::backward(const Local<T> &grad) const noexcept {
     dsl::backward(*this, grad);
 }
 

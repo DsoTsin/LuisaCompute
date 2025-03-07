@@ -65,4 +65,6 @@ public:
     [[nodiscard]] auto operator==(const Hash128 &rhs) const noexcept { return _data == rhs._data; }
 };
 
+LC_CORE_API Hash128 hash128(const void *ptr, size_t size, uint64_t seed) noexcept;
+
 }// namespace luisa

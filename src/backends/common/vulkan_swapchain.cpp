@@ -170,6 +170,15 @@ private:
         create_info.pView = cocoa_window_content_view(window_handle);
         LUISA_CHECK_VULKAN(vkCreateMacOSSurfaceMVK(_instance->handle(), &create_info, nullptr, &_surface));
 #else
+        static std::once_flag set_xlib_error_handler;
+        std::call_once(set_xlib_error_handler, [] {
+            XSetErrorHandler([](Display *display, XErrorEvent *error) noexcept {
+                char buffer[256] = {};
+                XGetErrorText(display, error->error_code, buffer, sizeof(buffer));
+                LUISA_WARNING_WITH_LOCATION("Xlib error: {}", buffer);
+                return 0;
+            });
+        });
         auto create_surface_xlib = [&] {
             VkXlibSurfaceCreateInfoKHR create_info{};
             create_info.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
@@ -1395,7 +1404,9 @@ public:
 LUISA_EXPORT_API void *luisa_compute_create_cpu_swapchain(uint64_t display_handle, uint64_t window_handle,
                                                           uint width, uint height, bool allow_hdr, bool vsync,
                                                           uint back_buffer_count) noexcept {
-    return new VulkanSwapchainForCPU{display_handle, window_handle, width, height, allow_hdr, vsync, back_buffer_count};
+    return luisa::new_with_allocator<VulkanSwapchainForCPU>(
+        display_handle, window_handle, width, height,
+        allow_hdr, vsync, back_buffer_count);
 }
 
 LUISA_EXPORT_API uint8_t luisa_compute_cpu_swapchain_storage(void *swapchain) noexcept {
@@ -1407,7 +1418,7 @@ LUISA_EXPORT_API void *luisa_compute_cpu_swapchain_native_handle(void *swapchain
 }
 
 LUISA_EXPORT_API void luisa_compute_destroy_cpu_swapchain(void *swapchain) noexcept {
-    delete static_cast<VulkanSwapchainForCPU *>(swapchain);
+    luisa::delete_with_allocator(static_cast<VulkanSwapchainForCPU *>(swapchain));
 }
 
 LUISA_EXPORT_API void luisa_compute_cpu_swapchain_present(void *swapchain, const void *pixels, uint64_t size) noexcept {

@@ -1,17 +1,9 @@
 #include <iostream>
-
-#include <luisa/core/clock.h>
-#include <luisa/core/logging.h>
-#include <luisa/runtime/context.h>
-#include <luisa/runtime/device.h>
-#include <luisa/runtime/stream.h>
-#include <luisa/runtime/event.h>
-#include <luisa/runtime/swapchain.h>
-#include <luisa/dsl/sugar.h>
-#include <luisa/runtime/rtx/accel.h>
+#include <luisa/backends/ext/dx_hdr_ext.hpp>
 #include <stb/stb_image_write.h>
-#include <luisa/gui/window.h>
-#include <luisa/ast/ast2json.h>
+
+#include <luisa/luisa-compute.h>
+#include <luisa/dsl/sugar.h>
 
 #include "common/cornell_box.h"
 
@@ -118,6 +110,7 @@ int main(int argc, char *argv[]) {
     };
 
     Callable tea = [](UInt v0, UInt v1) noexcept {
+        set_name("tea");
         UInt s0 = def(0u);
         for (uint n = 0u; n < 4u; n++) {
             s0 += 0x9e3779b9u;
@@ -128,12 +121,14 @@ int main(int argc, char *argv[]) {
     };
 
     Kernel2D make_sampler_kernel = [&](ImageUInt seed_image) noexcept {
+        set_name("make_sampler_kernel");
         UInt2 p = dispatch_id().xy();
         UInt state = tea(p.x, p.y);
         seed_image.write(p, make_uint4(state));
     };
 
     Callable lcg = [](UInt &state) noexcept {
+        set_name("lcg");
         constexpr uint lcg_a = 1664525u;
         constexpr uint lcg_c = 1013904223u;
         state = lcg_a * state + lcg_c;
@@ -142,6 +137,7 @@ int main(int argc, char *argv[]) {
     };
 
     Callable make_onb = [](const Float3 &normal) noexcept {
+        set_name("make_onb");
         Float3 binormal = normalize(ite(
             abs(normal.x) > abs(normal.z),
             make_float3(-normal.y, normal.x, 0.0f),
@@ -151,6 +147,7 @@ int main(int argc, char *argv[]) {
     };
 
     Callable generate_ray = [](Float2 p) noexcept {
+        set_name("generate_ray");
         static constexpr float fov = radians(27.8f);
         static constexpr float3 origin = make_float3(-0.01f, 0.995f, 5.0f);
         Float3 pixel = origin + make_float3(p * tan(0.5f * fov), -1.0f);
@@ -159,18 +156,21 @@ int main(int argc, char *argv[]) {
     };
 
     Callable cosine_sample_hemisphere = [](Float2 u) noexcept {
+        set_name("cosine_sample_hemisphere");
         Float r = sqrt(u.x);
         Float phi = 2.0f * constants::pi * u.y;
         return make_float3(r * cos(phi), r * sin(phi), sqrt(1.0f - u.x));
     };
 
     Callable balanced_heuristic = [](Float pdf_a, Float pdf_b) noexcept {
+        set_name("balanced_heuristic");
         return pdf_a / max(pdf_a + pdf_b, 1e-4f);
     };
 
-    auto spp_per_dispatch = device.backend_name() == "metal" || device.backend_name() == "cpu" ? 1u : 64u;
+    auto spp_per_dispatch = device.backend_name() == "metal" || device.backend_name() == "cpu" || device.backend_name() == "fallback" ? 1u : 64u;
 
     Kernel2D raytracing_kernel = [&](ImageFloat image, ImageUInt seed_image, AccelVar accel, UInt2 resolution) noexcept {
+        set_name("raytracing_kernel");
         set_block_size(16u, 16u, 1u);
         UInt2 coord = dispatch_id().xy();
         Float frame_size = min(resolution.x, resolution.y).cast<float>();
@@ -264,33 +264,24 @@ int main(int argc, char *argv[]) {
     };
 
     Kernel2D accumulate_kernel = [&](ImageFloat accum_image, ImageFloat curr_image) noexcept {
+        set_name("accumulate_kernel");
         UInt2 p = dispatch_id().xy();
         Float4 accum = accum_image.read(p);
         Float3 curr = curr_image.read(p).xyz();
         accum_image.write(p, accum + make_float4(curr, 1.f));
     };
 
-    Callable aces_tonemapping = [](Float3 x) noexcept {
-        static constexpr float a = 2.51f;
-        static constexpr float b = 0.03f;
-        static constexpr float c = 2.43f;
-        static constexpr float d = 0.59f;
-        static constexpr float e = 0.14f;
-        return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0f, 1.0f);
-    };
-
     Kernel2D clear_kernel = [](ImageFloat image) noexcept {
-        image.write(dispatch_id().xy(), make_float4(0.0f));
+        set_name("clear_kernel");
+        image.write(dispatch_id().xy(), make_float4(0.f));
     };
 
-    Kernel2D hdr2ldr_kernel = [&](ImageFloat hdr_image, ImageFloat ldr_image, Float scale, Bool is_hdr) noexcept {
+    Kernel2D hdr2ldr_kernel = [&](ImageFloat hdr_image, ImageFloat ldr_image, Float scale) noexcept {
+        set_name("hdr2ldr_kernel");
         UInt2 coord = dispatch_id().xy();
         Float4 hdr = hdr_image.read(coord);
-        Float3 ldr = hdr.xyz() / hdr.w * scale;
-        $if (!is_hdr) {
-            ldr = linear_to_srgb(ldr);
-        };
-        ldr_image.write(coord, make_float4(ldr, 1.0f));
+        Float3 ldr = linear_to_srgb(clamp(hdr.xyz() / hdr.w * scale, 0.f, 1.f));
+        ldr_image.write(coord, make_float4(ldr, 1.f));
     };
 
     ShaderOption o{.enable_debug_info = false};
@@ -304,10 +295,10 @@ int main(int argc, char *argv[]) {
     Image<float> framebuffer = device.create_image<float>(PixelStorage::HALF4, resolution);
     Image<float> accum_image = device.create_image<float>(PixelStorage::FLOAT4, resolution);
     luisa::vector<std::array<uint8_t, 4u>> host_image(resolution.x * resolution.y);
-    CommandList cmd_list;
+
     Image<uint> seed_image = device.create_image<uint>(PixelStorage::INT1, resolution);
-    cmd_list << clear_shader(accum_image).dispatch(resolution)
-             << make_sampler_shader(seed_image).dispatch(resolution);
+    stream << clear_shader(accum_image).dispatch(resolution)
+           << make_sampler_shader(seed_image).dispatch(resolution);
 
     Window window{"path tracing", resolution};
     Swapchain swap_chain = device.create_swapchain(
@@ -320,30 +311,29 @@ int main(int argc, char *argv[]) {
             .wants_vsync = false,
             .back_buffer_count = 8,
         });
+
     Image<float> ldr_image = device.create_image<float>(swap_chain.backend_storage(), resolution);
     double last_time = 0.0;
     uint frame_count = 0u;
     Clock clock;
 
     while (!window.should_close()) {
-        cmd_list << raytracing_shader(framebuffer, seed_image, accel, resolution)
-                        .dispatch(resolution)
-                 << accumulate_shader(accum_image, framebuffer)
-                        .dispatch(resolution);
-        cmd_list << hdr2ldr_shader(accum_image, ldr_image, 1.0f, swap_chain.backend_storage() != PixelStorage::BYTE4).dispatch(resolution);
-        stream << cmd_list.commit()
-               << swap_chain.present(ldr_image) << synchronize();
+        stream << raytracing_shader(framebuffer, seed_image, accel, resolution)
+                      .dispatch(resolution)
+               << accumulate_shader(accum_image, framebuffer)
+                      .dispatch(resolution)
+               << hdr2ldr_shader(accum_image, ldr_image, 2.f).dispatch(resolution)
+               << swap_chain.present(ldr_image)
+               << synchronize();
         window.poll_events();
         double dt = clock.toc() - last_time;
+        LUISA_INFO("dt = {:.2f}ms ({:.2f} spp/s)", dt, spp_per_dispatch / dt * 1000);
         last_time = clock.toc();
         frame_count += spp_per_dispatch;
-        LUISA_INFO("spp: {}, time: {} ms, spp/s: {}",
-                   frame_count, dt, spp_per_dispatch / dt * 1000);
     }
     stream
         << ldr_image.copy_to(host_image.data())
         << synchronize();
-
     LUISA_INFO("FPS: {}", frame_count / clock.toc() * 1000);
     stbi_write_png("test_path_tracing.png", resolution.x, resolution.y, 4, host_image.data(), 0);
 }

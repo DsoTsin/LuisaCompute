@@ -9,6 +9,11 @@
 #include <luisa/core/logging.h>
 #include <luisa/ast/external_function.h>
 #include "builtin/hlsl_builtin.hpp"
+#if __has_include(<zlib.h>)
+#include <zlib.h>
+#else
+#include <zlib/zlib.h>
+#endif
 static bool shown_buffer_warning = false;
 namespace lc::hlsl {
 static std::atomic_bool rootsig_exceed_warned = false;
@@ -57,8 +62,32 @@ struct SpirVRegisterIndexer : public RegisterIndexer {
         return count;
     }
 };
+
 vstd::string_view CodegenUtility::ReadInternalHLSLFile(vstd::string_view name) {
-    return lc_hlsl::get_hlsl_builtin(name);
+    struct CachedHeader {
+        std::mutex mtx;
+        vstd::vector<char> result;
+    };
+    static vstd::HashMap<vstd::string, CachedHeader> headers;
+    static std::mutex header_mtx;
+    auto iter = [&]() {
+        std::lock_guard lck{header_mtx};
+        return headers.emplace(name);
+    }();
+    auto &v = iter.value();
+    {
+        std::lock_guard lck{v.mtx};
+        if (v.result.empty()) {
+            auto compressed = lc_hlsl::get_hlsl_builtin(name);
+            v.result.push_back_uninitialized(compressed.uncompressed_size);
+            uLong dest_len = compressed.uncompressed_size;
+            auto r = uncompress((Bytef *)v.result.data(), &dest_len, (Bytef const *)compressed.ptr, compressed.compressed_size);
+            if (r != Z_OK) [[unlikely]] {
+                LUISA_ERROR("Uncompress header failed. {}", r);
+            }
+        }
+    }
+    return {v.result.data(), v.result.size()};
 }
 namespace detail {
 static size_t AddHeader(CallOpSet const &ops, vstd::StringBuilder &builder, bool isRaster) {
@@ -685,7 +714,7 @@ void CodegenUtility::GetFunctionName(CallExpr const *expr, vstd::StringBuilder &
             return;
         }
         case CallOp::TEXTURE_READ:
-            str << "_Smptx";
+            str << "_Readtx";
             break;
         case CallOp::TEXTURE_WRITE:
             str << "_Writetx";
@@ -935,34 +964,70 @@ void CodegenUtility::GetFunctionName(CallExpr const *expr, vstd::StringBuilder &
                 str << "_SampleTex2D"sv;
             }
             break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_SAMPLER:
+            opt->useTex2DBindless = true;
+            if (opt->isPixelShader) {
+                str << "_SampleTex2DPixelSmp"sv;
+            } else {
+                str << "_SampleTex2DSmp"sv;
+            }
+            break;
 
         case CallOp::BINDLESS_TEXTURE2D_SAMPLE_LEVEL:
             opt->useTex2DBindless = true;
             str << "_SampleTex2DLevel"sv;
             break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_LEVEL_SAMPLER:
+            opt->useTex2DBindless = true;
+            str << "_SampleTex2DLevelSmp"sv;
+            break;
         case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD:
             opt->useTex2DBindless = true;
             str << "_SampleTex2DGrad"sv;
+            break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_SAMPLER:
+            opt->useTex2DBindless = true;
+            str << "_SampleTex2DGradSmp"sv;
             break;
         case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_LEVEL:
             opt->useTex2DBindless = true;
             str << "_SampleTex2DGradLevel"sv;
             break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_LEVEL_SAMPLER:
+            opt->useTex2DBindless = true;
+            str << "_SampleTex2DGradLevelSmp"sv;
+            break;
         case CallOp::BINDLESS_TEXTURE3D_SAMPLE:
             opt->useTex3DBindless = true;
             str << "_SampleTex3D"sv;
+            break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_SAMPLER:
+            opt->useTex3DBindless = true;
+            str << "_SampleTex3DSmp"sv;
             break;
         case CallOp::BINDLESS_TEXTURE3D_SAMPLE_LEVEL:
             opt->useTex3DBindless = true;
             str << "_SampleTex3DLevel"sv;
             break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_LEVEL_SAMPLER:
+            opt->useTex3DBindless = true;
+            str << "_SampleTex3DLevelSmp"sv;
+            break;
         case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD:
             opt->useTex3DBindless = true;
             str << "_SampleTex3DGrad"sv;
             break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_SAMPLER:
+            opt->useTex3DBindless = true;
+            str << "_SampleTex3DGradSmp"sv;
+            break;
         case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_LEVEL:
             opt->useTex3DBindless = true;
             str << "_SampleTex3DGradLevel"sv;
+            break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_LEVEL_SAMPLER:
+            opt->useTex3DBindless = true;
+            str << "_SampleTex3DGradLevelSmp"sv;
             break;
         case CallOp::BINDLESS_TEXTURE2D_READ:
             opt->useTex2DBindless = true;
@@ -1000,12 +1065,12 @@ void CodegenUtility::GetFunctionName(CallExpr const *expr, vstd::StringBuilder &
             str << "GroupMemoryBarrierWithGroupSync()"sv;
             return;
         case CallOp::RASTER_DISCARD:
-            LUISA_ASSERT(opt->funcType == CodegenStackData::FuncType::Pixel, "Raster-Discard can only be used in pixel shader");
+            LUISA_ASSERT(opt->isPixelShader, "Raster-Discard can only be used in pixel shader");
             str << "discard";
             return;
         case CallOp::DDX: {
             if (opt->isRaster) {
-                LUISA_ASSERT(opt->funcType == CodegenStackData::FuncType::Pixel, "ddx can only be used in pixel shader");
+                LUISA_ASSERT(opt->isPixelShader, "ddx can only be used in pixel shader");
                 str << "ddx"sv;
             } else {
                 str << "_ddx"sv;
@@ -1013,7 +1078,7 @@ void CodegenUtility::GetFunctionName(CallExpr const *expr, vstd::StringBuilder &
         } break;
         case CallOp::DDY: {
             if (opt->isRaster) {
-                LUISA_ASSERT(opt->funcType == CodegenStackData::FuncType::Pixel, "ddy can only be used in pixel shader");
+                LUISA_ASSERT(opt->isPixelShader, "ddy can only be used in pixel shader");
                 str << "ddy"sv;
             } else {
                 str << "_ddy"sv;
@@ -1229,6 +1294,28 @@ void CodegenUtility::GetFunctionName(CallExpr const *expr, vstd::StringBuilder &
         case CallOp::UNPACK: LUISA_NOT_IMPLEMENTED();
         case CallOp::BINDLESS_BUFFER_WRITE: LUISA_NOT_IMPLEMENTED();
         case CallOp::WARP_FIRST_ACTIVE_LANE: LUISA_NOT_IMPLEMENTED();
+        case CallOp::TEXTURE2D_SAMPLE:
+        case CallOp::TEXTURE3D_SAMPLE:
+            if (opt->isPixelShader) {
+                str << "_SmptxPixel"sv;
+            } else {
+                str << "_Smptx"sv;
+            }
+            break;
+        case CallOp::TEXTURE2D_SAMPLE_LEVEL:
+        case CallOp::TEXTURE3D_SAMPLE_LEVEL:
+            str << "_SmptxLevel"sv;
+            break;
+        case CallOp::TEXTURE3D_SAMPLE_GRAD:
+        case CallOp::TEXTURE2D_SAMPLE_GRAD:
+            str << "_SmptxGrad"sv;
+            break;
+        case CallOp::TEXTURE2D_SAMPLE_GRAD_LEVEL:
+            str << "_SmptxGrad2DLevel"sv;
+            break;
+        case CallOp::TEXTURE3D_SAMPLE_GRAD_LEVEL:
+            str << "_SmptxGrad3DLevel"sv;
+            break;
         case CallOp::SHADER_EXECUTION_REORDER:
             str << "(void)";
             break;
@@ -1497,20 +1584,7 @@ void main(uint3 thdId:SV_GroupThreadId,uint3 dspId:SV_DispatchThreadID,uint3 grp
     callable(callable, func);
 }
 void CodegenUtility::CodegenVertex(Function vert, vstd::StringBuilder &result, bool cBufferNonEmpty) {
-    vstd::unordered_set<void const *> callableMap;
-    auto gen = [&](auto &callable, Function func) -> void {
-        for (auto &&i : func.custom_callables()) {
-            if (callableMap.emplace(i.get()).second) {
-                Function f(i.get());
-                callable(callable, f);
-            }
-        }
-    };
-    auto callable = [&](auto &callable, Function func) -> void {
-        gen(callable, func);
-        CodegenFunction(func, result, cBufferNonEmpty);
-    };
-    gen(callable, vert);
+    CodegenFunction(vert, result, cBufferNonEmpty);
     auto args = vert.arguments();
     vstd::StringBuilder retName;
     auto retType = vert.return_type();
@@ -1547,20 +1621,7 @@ void CodegenUtility::CodegenVertex(Function vert, vstd::StringBuilder &result, b
 void CodegenUtility::CodegenPixel(Function pixel, vstd::StringBuilder &result, bool cBufferNonEmpty) {
     opt->isPixelShader = true;
     auto resetPixelShaderKey = vstd::scope_exit([&] { opt->isPixelShader = false; });
-    vstd::unordered_set<void const *> callableMap;
-    auto gen = [&](auto &callable, Function func) -> void {
-        for (auto &&i : func.custom_callables()) {
-            if (callableMap.emplace(i.get()).second) {
-                Function f(i.get());
-                callable(callable, f);
-            }
-        }
-    };
-    auto callable = [&](auto &callable, Function func) -> void {
-        gen(callable, func);
-        CodegenFunction(func, result, cBufferNonEmpty);
-    };
-    gen(callable, pixel);
+    CodegenFunction(pixel, result, cBufferNonEmpty);
     vstd::StringBuilder retName;
     auto retType = pixel.return_type();
     GetTypeName(*retType, retName, Usage::READ);
@@ -2092,7 +2153,7 @@ uint4 dsp_c;
         LUISA_ERROR("Arguments binding size: {} exceeds 64 32-bit units not supported by hardware device. Try to use bindless instead.", bind_count);
     } else if (bind_count > 16) [[unlikely]] {
         if (!rootsig_exceed_warned.exchange(true)) {
-            LUISA_WARNING("Arguments binding size exceeds 16 32-bit unit (max 64 allowed). This may cause extra performance cost, try to use bindless instead.");
+            LUISA_WARNING("Arguments binding size {} exceeds 16 32-bit unit (max 64 allowed). This may cause extra performance cost, try to use bindless instead.", bind_count);
         }
     }
     return {
@@ -2253,7 +2314,7 @@ uint obj_id:register(b0);
         LUISA_ERROR("Arguments binding size: {} exceeds 64 32-bit units not supported by hardware device. Try to use bindless instead.", bind_count);
     } else if (bind_count > 16) [[unlikely]] {
         if (!rootsig_exceed_warned.exchange(true)) {
-            LUISA_WARNING("Arguments binding size exceeds 16 32-bit unit (max 64 allowed). This may cause extra performance cost, try to use bindless instead.");
+            LUISA_WARNING("Arguments binding size {} exceeds 16 32-bit unit (max 64 allowed). This may cause extra performance cost, try to use bindless instead.", bind_count);
         }
     }
     return {

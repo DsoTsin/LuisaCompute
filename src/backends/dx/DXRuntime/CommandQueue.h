@@ -61,7 +61,7 @@ public:
     void ExecuteCallbacks(AllocatorPtr &&alloc, vstd::vector<vstd::function<void()>> &&callbacks);
     void ExecuteEmpty(AllocatorPtr &&alloc);
     void ExecuteEmptyCallbacks(AllocatorPtr &&alloc, vstd::vector<vstd::function<void()>> &&callbacks);
-    void ExecuteAndPresent(AllocatorPtr &&alloc, IDXGISwapChain3 *swapChain, bool vsync);
+    void ExecuteAndPresent(AllocatorPtr &&alloc, IDXGISwapChain *swapChain, bool vsync);
     void Complete(uint64 fence);
     void Complete();
     void ForceSync(

@@ -1,6 +1,8 @@
 #pragma once
+
 #include <luisa/dsl/ref.h>
 #include <luisa/dsl/arg.h>
+
 // X11 macro
 #ifdef Bool
 #undef Bool
@@ -11,12 +13,12 @@ namespace luisa::compute {
 namespace detail {
 
 template<typename T>
-void apply_default_initializer(Ref<T> var) noexcept {
+void apply_default_initializer(const Ref<T> &var) noexcept {
     if constexpr (luisa::is_basic_v<T>) {
         dsl::assign(var, T{});
     } else {
         auto impl = [&var]<size_t... i>(std::index_sequence<i...>) noexcept {
-            (apply_default_initializer(detail::Ref{var.template get<i>()}), ...);
+            (apply_default_initializer(var.template get<i>()), ...);
         };
         impl(std::make_index_sequence<std::tuple_size_v<struct_member_tuple_t<T>>>{});
     }
@@ -28,6 +30,13 @@ void apply_default_initializer(Ref<T> var) noexcept {
 template<typename T>
 struct Var : public detail::Ref<T> {
 
+private:
+    struct LocalCreationTag {};
+    explicit Var(LocalCreationTag) noexcept
+        : detail::Ref<T>{static_cast<const Expression *>(
+              detail::FunctionBuilder::current()->local(Type::of<T>()))} {}
+
+public:
     static_assert(std::is_trivially_destructible_v<T>);
 
     /// Construct from expression
@@ -36,29 +45,28 @@ struct Var : public detail::Ref<T> {
 
     // for local variables of basic or array types
     /// Construct a local variable of basic or array types
-    Var() noexcept
-        : detail::Ref<T>{detail::FunctionBuilder::current()->local(Type::of<T>())} {
+    Var() noexcept : Var{LocalCreationTag{}} {
         // we have to apply the default initializer here so the variable
         // is properly defined right after construction
-        detail::apply_default_initializer(detail::Ref{*this});
+        detail::apply_default_initializer(*this);
     }
 
     /// Assign members from args
     template<typename... Args, size_t... i>
-    Var(std::tuple<Args...> args, std::index_sequence<i...>) noexcept : Var{} {
+    Var(std::tuple<Args...> args, std::index_sequence<i...>) noexcept : Var{LocalCreationTag{}} {
         (dsl::assign(this->template get<i>(), std::get<i>(args)), ...);
     }
 
     /// Assign members
     template<typename... Args>
     Var(std::tuple<Args...> args) noexcept
-        : Var{args, std::index_sequence_for<Args...>{}} {}
+        : Var{std::move(args), std::index_sequence_for<Args...>{}} {}
 
     /// Assign from a single argument
     template<typename Arg>
-        requires concepts::different<std::remove_cvref_t<Arg>, Var<T>> &&
+        requires concepts::different<std::remove_cvref_t<Arg>, Var> &&
                  std::negation_v<std::is_pointer<std::remove_cvref_t<Arg>>>
-    Var(Arg &&arg) noexcept : Var{} {
+    Var(Arg &&arg) noexcept : Var{LocalCreationTag{}} {
         using member_tuple = struct_member_tuple_t<T>;
         if constexpr (std::tuple_size_v<member_tuple> > 1u ||
                       std::is_same_v<expr_value_t<Arg>, T>) {
@@ -78,12 +86,19 @@ struct Var : public detail::Ref<T> {
 
     // create as function arguments, for internal use only
     explicit Var(detail::ArgumentCreation) noexcept
-        : detail::Ref<T>{detail::FunctionBuilder::current()->argument(Type::of<T>())} {}
+        : detail::Ref<T>{static_cast<const Expression *>(
+              detail::FunctionBuilder::current()->argument(Type::of<T>()))} {}
+
     explicit Var(detail::ReferenceArgumentCreation) noexcept
-        : detail::Ref<T>{detail::FunctionBuilder::current()->reference(Type::of<T>())} {}
+        : detail::Ref<T>{static_cast<const Expression *>(
+              detail::FunctionBuilder::current()->reference(Type::of<T>()))} {}
 
     Var(Var &&) noexcept = default;
-    Var(const Var &another) noexcept : Var{Expr{another}} {}
+
+    Var(const Var &another) noexcept : Var{LocalCreationTag{}} {
+        detail::FunctionBuilder::current()->assign(this->expression(), another.expression());
+    }
+
     const Var &operator=(Var &&rhs) & noexcept {
         detail::Ref<T>::operator=(std::move(rhs));
         return *this;

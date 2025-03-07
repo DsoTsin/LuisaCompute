@@ -8,6 +8,27 @@ set_showmenu(false)
 set_default(false)
 option_end()
 
+option("_lc_vk_sdk_dir")
+set_default(false)
+set_showmenu(false)
+add_deps("vk_support")
+after_check(function(option)
+    if not option:dep("vk_support"):enabled() then
+        option:set_value(false)
+        return
+    end
+    local sdk_dir = os.getenv("VK_SDK_PATH")
+    if not sdk_dir then
+        sdk_dir = os.getenv("VULKAN_SDK")
+    end
+    if not sdk_dir then
+        option:set_value(false)
+    else
+        option:set_value(sdk_dir)
+    end
+end)
+option_end()
+
 option("_lc_check_env")
 set_showmenu(false)
 set_default(false)
@@ -29,10 +50,10 @@ option_end()
 option("_lc_bin_dir")
 set_default(false)
 set_showmenu(false)
-add_deps("enable_mimalloc", "enable_unity_build", "enable_simd", "dx_backend", "vk_backend", "cuda_backend",
-    "metal_backend", "cpu_backend", "enable_tests", "enable_custom_malloc", "enable_clangcxx", "py_include",
-    "py_linkdir", "external_marl", "py_libs", "cuda_ext_lcub", "enable_ir", "enable_osl", "enable_api", "enable_dsl",
-    "enable_gui", "bin_dir", "sdk_dir", "_lc_enable_py", "_lc_enable_rust")
+add_deps("dx_backend", "vk_backend", "cuda_backend",
+    "metal_backend", "cpu_backend", "enable_tests", "py_include",
+    "cuda_ext_lcub", "enable_ir", "enable_dsl",
+    "enable_gui", "bin_dir", "_lc_enable_py", "_lc_enable_rust")
 before_check(function(option)
     if path.absolute(path.join(os.projectdir(), "scripts")) == path.absolute(os.scriptdir()) then
         local v = import("options", {
@@ -199,12 +220,15 @@ on_load(function(target)
     if project_kind then
         target:set("kind", project_kind)
     end
-    if not is_plat("windows") then
+    if is_plat("linux") then
         if project_kind == "static" or project_kind == "object" then
             target:add("cxflags", "-fPIC", {
                 tools = {"clang", "gcc"}
             })
         end
+    end
+    if is_plat("macosx") then
+        target:add("cxflags", "-no-pie")
     end
     -- fma support
     if is_arch("x64", "x86_64") then
@@ -212,8 +236,8 @@ on_load(function(target)
             tools = {"clang", "gcc"}
         })
     end
-    local c_standard = target:values("c_standard")
-    local cxx_standard = target:values("cxx_standard")
+    local c_standard = _get_or("c_standard", nil)
+    local cxx_standard = _get_or("cxx_standard", nil)
     if type(c_standard) == "string" and type(cxx_standard) == "string" then
         target:set("languages", c_standard, cxx_standard, {
             public = true
@@ -231,23 +255,34 @@ on_load(function(target)
         target:set("exceptions", "no-cxx")
     end
 
+    local force_optimize = _get_or("force_optimize", nil)
     if is_mode("debug") then
         target:set("runtimes", _get_or("runtime", "MDd"), {
             public = true
         })
-        target:set("optimize", "none")
+        if force_optimize then
+            target:set("optimize", "aggressive")
+        else
+            target:set("optimize", "none")
+        end
         target:set("warnings", "none")
         target:add("cxflags", "/GS", "/Gd", {
-            tools = {"clang_cl", "cl"}
-        })
-    elseif is_mode("releasedbg") then
-        target:set("runtimes", _get_or("runtime", "MD"), {
+            tools = {"clang_cl", "cl"},
             public = true
         })
-        target:set("optimize", "none")
+    elseif is_mode("releasedbg") then
+        target:set("runtimes", _get_or("runtime", "MDd"), {
+            public = true
+        })
+        if force_optimize then
+            target:set("optimize", "aggressive")
+        else
+            target:set("optimize", "none")
+        end
         target:set("warnings", "none")
         target:add("cxflags", "/GS-", "/Gd", {
-            tools = {"clang_cl", "cl"}
+            tools = {"clang_cl", "cl"},
+            public = true
         })
     else
         target:set("runtimes", _get_or("runtime", "MD"), {
@@ -256,7 +291,8 @@ on_load(function(target)
         target:set("optimize", "aggressive")
         target:set("warnings", "none")
         target:add("cxflags", "/GS-", "/Gd", {
-            tools = {"clang_cl", "cl"}
+            tools = {"clang_cl", "cl"},
+            public = true
         })
     end
     target:set("fpmodels", "fast")
@@ -266,9 +302,13 @@ on_load(function(target)
     });
     if _get_or("use_simd", get_config("enable_simd")) then
         if is_arch("arm64") then
-            target:add("vectorexts", "neon")
+            target:add("vectorexts", "neon", {
+                public = true
+            })
         else
-            target:add("vectorexts", "avx", "avx2")
+            target:add("vectorexts", "avx", "avx2", {
+                public = true
+            })
         end
     end
     if _get_or("no_rtti", not get_config("_lc_enable_py")) then
@@ -351,7 +391,7 @@ on_buildcmd_file(function(target, batchcmds, sourcefile, opt)
         sb:add("--release ")
     end
     local cargo_cmd = sb:to_string()
-    print(cargo_cmd)
+    batchcmds:show(cargo_cmd)
     batchcmds:vrunv(cargo_cmd)
     sb:dispose()
 end)
@@ -359,17 +399,20 @@ rule_end()
 
 rule('lc_install_sdk')
 on_load(function(target)
+    local custom_sdk_dir = get_config("sdk_dir")
+    if type(custom_sdk_dir ) == "string" and not os.exists(custom_sdk_dir) then
+        return
+    end
     local packages = import('packages')
     local libnames = target:extraconf("rules", "lc_install_sdk", "libnames")
     local find_sdk = import('find_sdk')
     local enable = true
-    local sdk_dir = get_config("sdk_dir")
     for _, lib in ipairs(libnames) do
-        local valid = find_sdk.check_file(lib, sdk_dir)
+        local valid = find_sdk.check_file(lib, custom_sdk_dir)
         if not valid then
             utils.error("Library: " .. packages.sdks()[lib]['name'] ..
                             " not installed, run 'xmake lua setup.lua' or download it manually from " ..
-                            packages.sdk_address(packages.sdks()[lib]) .. ' to ' .. packages.sdk_dir(os.arch(), sdk_dir) ..
+                            packages.sdk_address(packages.sdks()[lib]) .. ' to ' .. packages.sdk_dir(os.arch(), custom_sdk_dir) ..
                             '.')
             enable = false
         end
@@ -379,6 +422,10 @@ on_load(function(target)
     end
 end)
 on_clean(function(target)
+    local custom_sdk_dir = get_config("sdk_dir")
+    if type(custom_sdk_dir ) == "string" and not os.exists(custom_sdk_dir) then
+        return
+    end
     local bin_dir = target:targetdir()
     local find_sdk = import('find_sdk')
     local packages = import('packages')
@@ -393,6 +440,10 @@ on_clean(function(target)
     end
 end)
 before_build(function(target)
+    local custom_sdk_dir = get_config("sdk_dir")
+    if type(custom_sdk_dir ) == "string" and not os.exists(custom_sdk_dir) then
+        return
+    end
     local bin_dir = target:targetdir()
     local lib = import('lib')
     lib.mkdirs(bin_dir)
@@ -400,7 +451,7 @@ before_build(function(target)
     local packages = import('packages')
     local find_sdk = import('find_sdk')
     local sdks = packages.sdks()
-    local sdk_dir = packages.sdk_dir(os.arch(), get_config("sdk_dir"))
+    local sdk_dir = packages.sdk_dir(os.arch(), custom_sdk_dir)
     for _, lib in ipairs(libnames) do
         local sdk_map = sdks[lib]
         local zip = sdk_map['name']
@@ -411,7 +462,7 @@ before_build(function(target)
         end
         if not data or data ~= sdk_map['sha256'] then
             io.writefile(cache_file_name, sdk_map['sha256'])
-            find_sdk.unzip_sdk(lib .. '.zip', sdk_dir, bin_dir)
+            find_sdk.unzip_sdk(zip, sdk_dir, bin_dir)
         end
     end
 end)

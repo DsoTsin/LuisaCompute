@@ -43,12 +43,12 @@
         if (ret != VK_SUCCESS) [[unlikely]] {                            \
             if (ret > 0 || ret == VK_ERROR_OUT_OF_DATE_KHR) [[likely]] { \
                 LUISA_WARNING_WITH_LOCATION(                             \
-                    "Vulkan call `" #x "` returned {}.",                 \
-                    ::luisa::to_string(ret));                            \
+                    "Vulkan call `" #x "` returned {} (code = {}).",     \
+                    ::luisa::to_string(ret), luisa::to_underlying(ret)); \
             } else [[unlikely]] {                                        \
                 LUISA_ERROR_WITH_LOCATION(                               \
-                    "Vulkan call `" #x "` failed: {}.",                  \
-                    ::luisa::to_string(ret));                            \
+                    "Vulkan call `" #x "` failed: {} (code = {}).",      \
+                    ::luisa::to_string(ret), luisa::to_underlying(ret)); \
             }                                                            \
         }                                                                \
     } while (false)

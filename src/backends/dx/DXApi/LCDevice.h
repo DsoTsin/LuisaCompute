@@ -2,6 +2,7 @@
 #include <luisa/vstl/common.h>
 #include <luisa/runtime/device.h>
 #include <DXRuntime/Device.h>
+#include <DXRuntime/UpdateTileTracker.h>
 namespace lc::dx {
 using namespace luisa;
 using namespace luisa::compute;

@@ -82,7 +82,7 @@ public:
     [[nodiscard]] auto copy_from(const Buffer<U> &buffer) const noexcept {
         return copy_from(buffer.view());
     }
-    
+
     template<typename U>
     [[nodiscard]] auto copy_to(BufferView<U> buffer) const noexcept {
         if (auto size = size_bytes(); buffer.size_bytes() < size) {
@@ -126,4 +126,3 @@ public:
 }// namespace detail
 
 }// namespace luisa::compute
-

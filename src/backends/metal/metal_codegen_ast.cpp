@@ -30,11 +30,10 @@ public:
     void operator()(double v) const noexcept {
         if (std::isnan(v)) [[unlikely]] { LUISA_ERROR_WITH_LOCATION("Encountered with NaN."); }
         if (std::isinf(v)) {
-            _s << (v < 0.0 ? "double(-INFINITY)" : "double(+INFINITY)");
+            _s << (v < 0.0 ? "-INFINITY" : "+INFINITY");
         } else {
             _s << v;
         }
-        LUISA_ERROR_WITH_LOCATION("Double literals are not supported.");
     }
     void operator()(half v) const noexcept {
         if (luisa::isnan(v)) [[unlikely]] { LUISA_ERROR_WITH_LOCATION("Encountered with NaN."); }
@@ -231,7 +230,7 @@ void MetalCodegenAST::_emit_type_decls(Function kernel) noexcept {
     // process types in topological order
     types.clear();
     auto emit = [&](auto &&self, auto type) noexcept -> void {
-        if (types.emplace(type).second) {
+        if (type != nullptr && types.emplace(type).second) {
             if (type->is_array() || type->is_buffer()) {
                 self(self, type->element());
             } else if (type->is_structure()) {
@@ -668,6 +667,16 @@ void MetalCodegenAST::emit(Function kernel, luisa::string_view native_include) n
 
     _uses_printing = kernel.requires_printing();
 
+    // ray query
+    if (kernel.propagated_builtin_callables().uses_ray_query()) {
+        _scratch << "#define LUISA_ENABLE_RAY_QUERY\n";
+    }
+
+    // motion blur
+    if (kernel.requires_motion_blur()) {
+        _scratch << "#define LUISA_ENABLE_MOTION_BLUR\n";
+    }
+
     // curve basis
     if (auto bases = kernel.required_curve_bases(); bases.any()) {
         _scratch << "#define LUISA_ENABLE_CURVE\n";
@@ -950,7 +959,12 @@ void MetalCodegenAST::visit(const CallExpr *expr) noexcept {
         case CallOp::BUFFER_READ: _scratch << "buffer_read"; break;
         case CallOp::BUFFER_WRITE: _scratch << "buffer_write"; break;
         case CallOp::BUFFER_SIZE: _scratch << "buffer_size"; break;
-        case CallOp::BYTE_BUFFER_READ: _scratch << "byte_buffer_read"; break;
+        case CallOp::BYTE_BUFFER_READ: {
+            _scratch << "byte_buffer_read<";
+            _emit_type_name(expr->type());
+            _scratch << ">";
+            break;
+        }
         case CallOp::BYTE_BUFFER_WRITE: _scratch << "byte_buffer_write"; break;
         case CallOp::BYTE_BUFFER_SIZE: _scratch << "byte_buffer_size"; break;
         case CallOp::TEXTURE_READ: _scratch << "texture_read"; break;
@@ -999,6 +1013,8 @@ void MetalCodegenAST::visit(const CallExpr *expr) noexcept {
             LUISA_CUDA_CODEGEN_MAKE_VECTOR_CALL(bool, BOOL)
             LUISA_CUDA_CODEGEN_MAKE_VECTOR_CALL(short, SHORT)
             LUISA_CUDA_CODEGEN_MAKE_VECTOR_CALL(ushort, USHORT)
+            LUISA_CUDA_CODEGEN_MAKE_VECTOR_CALL(char, BYTE)
+            LUISA_CUDA_CODEGEN_MAKE_VECTOR_CALL(uchar, UBYTE)
             LUISA_CUDA_CODEGEN_MAKE_VECTOR_CALL(int, INT)
             LUISA_CUDA_CODEGEN_MAKE_VECTOR_CALL(uint, UINT)
             LUISA_CUDA_CODEGEN_MAKE_VECTOR_CALL(long, LONG)
@@ -1103,9 +1119,45 @@ void MetalCodegenAST::visit(const CallExpr *expr) noexcept {
         case CallOp::WARP_READ_LANE: _scratch << "lc_warp_read_lane"; break;
         case CallOp::WARP_READ_FIRST_ACTIVE_LANE: _scratch << "lc_warp_read_first_active_lane"; break;
         case CallOp::SHADER_EXECUTION_REORDER: _scratch << "lc_shader_execution_reorder"; break;
-        case CallOp::ADDRESS_OF: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BUFFER_ADDRESS: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_BUFFER_ADDRESS: LUISA_NOT_IMPLEMENTED();
+        case CallOp::ADDRESS_OF: _scratch << "lc_address_of"; break;
+        case CallOp::BUFFER_ADDRESS: _scratch << "buffer_address"; break;
+        case CallOp::BINDLESS_BUFFER_ADDRESS: _scratch << "bindless_buffer_address"; break;
+
+        case CallOp::RAY_TRACING_INSTANCE_MOTION_MATRIX: break;
+        case CallOp::RAY_TRACING_INSTANCE_MOTION_SRT: break;
+        case CallOp::RAY_TRACING_SET_INSTANCE_MOTION_MATRIX: break;
+        case CallOp::RAY_TRACING_SET_INSTANCE_MOTION_SRT: break;
+
+        case CallOp::RAY_TRACING_TRACE_CLOSEST_MOTION_BLUR: _scratch << "accel_trace_closest_motion_blur"; break;
+        case CallOp::RAY_TRACING_TRACE_ANY_MOTION_BLUR: _scratch << "accel_trace_any_motion_blur"; break;
+        case CallOp::RAY_TRACING_QUERY_ALL_MOTION_BLUR: _scratch << "accel_query_all_motion_blur"; break;
+        case CallOp::RAY_TRACING_QUERY_ANY_MOTION_BLUR: _scratch << "accel_query_all_motion_blur"; break;
+
+        case CallOp::TEXTURE2D_SAMPLE:
+        case CallOp::TEXTURE3D_SAMPLE:
+            _scratch << "texture_sample";
+            break;
+        case CallOp::TEXTURE2D_SAMPLE_LEVEL:
+        case CallOp::TEXTURE3D_SAMPLE_LEVEL:
+            _scratch << "texture_sample_level";
+            break;
+        case CallOp::TEXTURE2D_SAMPLE_GRAD:
+        case CallOp::TEXTURE3D_SAMPLE_GRAD:
+            _scratch << "texture_sample_grad";
+            break;
+        case CallOp::TEXTURE2D_SAMPLE_GRAD_LEVEL:
+        case CallOp::TEXTURE3D_SAMPLE_GRAD_LEVEL:
+            _scratch << "texture_sample_grad_level";
+            break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_SAMPLER: _scratch << "bindless_texture_sample2d_sample"; break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_LEVEL_SAMPLER: _scratch << "bindless_texture_sample2d_level_sample"; break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_SAMPLER: _scratch << "bindless_texture_sample2d_grad_sample"; break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_LEVEL_SAMPLER: _scratch << "bindless_texture_sample2d_grad_level_sample"; break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_SAMPLER: _scratch << "bindless_texture_sample3d_sample"; break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_LEVEL_SAMPLER: _scratch << "bindless_texture_sample3d_level_sample"; break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_SAMPLER: _scratch << "bindless_texture_sample3d_grad_sample"; break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_LEVEL_SAMPLER: _scratch << "bindless_texture_sample3d_grad_level_sample"; break;
+        case CallOp::CLOCK: LUISA_NOT_IMPLEMENTED();
     }
     _scratch << "(";
     if (auto op = expr->op(); is_atomic_operation(op)) {

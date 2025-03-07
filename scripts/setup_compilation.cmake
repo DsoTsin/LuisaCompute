@@ -28,8 +28,9 @@ if (CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64" OR
 else ()
     if (APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         # workaround for Apple clang -Xarch_arm64 bug with precompiled headers
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-command-line-argument -Xarch_arm64 no-unused-command-line-argument")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-command-line-argument -Xarch_arm64 no-unused-command-line-argument")
+        set(CMAKE_DISABLE_PRECOMPILE_HEADERS ON CACHE BOOL "Disable precompiled headers" FORCE)
+        # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-command-line-argument -Xarch_arm64 no-unused-command-line-argument")
+        # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-command-line-argument -Xarch_arm64 no-unused-command-line-argument")
     endif ()
 endif ()
 
@@ -50,7 +51,7 @@ if (NOT CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
 endif ()
 
 # LTO
-option(LUISA_COMPUTE_ENABLE_LTO "Enable link-time optimization (for release builds only)" ON)
+option(LUISA_COMPUTE_ENABLE_LTO "Enable link-time optimization (for release builds only)" OFF)
 if (LUISA_COMPUTE_ENABLE_LTO)
     if (CMAKE_C_COMPILER_ID MATCHES "Clang" AND
             CMAKE_C_COMPILER_VERSION VERSION_LESS 15.0)

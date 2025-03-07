@@ -4,10 +4,10 @@
 #include <bitset>
 
 #include <luisa/core/basic_traits.h>
-#include <luisa/core/stl/string.h>
 #include <luisa/core/stl/hash.h>
 
 namespace luisa::compute {
+
 enum class CurveBasis : uint32_t {
     /// Piecewise linear curve cone with spherical end caps.
     /// Each curve segment needs to have two control points.
@@ -18,7 +18,7 @@ enum class CurveBasis : uint32_t {
     /// Cubic Catmull-Rom curve cone with open ends (i.e., no end caps).
     /// Each curve segment needs to have four control points.
     CATMULL_ROM,
-    /// Cubic Bezier curve cone with open ends (i.e., no end caps).
+    /// Cubic Bézier curve cone with open ends (i.e., no end caps).
     /// Each curve segment needs to have four control points.
     BEZIER
 };

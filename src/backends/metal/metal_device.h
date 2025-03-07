@@ -11,6 +11,7 @@ class MetalDStorageExt;
 class MetalDebugCaptureExt;
 class MetalPinnedMemoryExt;
 class MetalDenoiserExt;
+class MetalTexCompressExt;
 
 class MetalDevice : public DeviceInterface {
 
@@ -36,6 +37,7 @@ private:
     luisa::unique_ptr<MetalDStorageExt> _dstorage_ext;
     luisa::unique_ptr<MetalPinnedMemoryExt> _pinned_memory_ext;
     luisa::unique_ptr<MetalDebugCaptureExt> _debug_capture_ext;
+    luisa::unique_ptr<MetalTexCompressExt> _tex_compress_ext;
 
 #if LUISA_BACKEND_ENABLE_OIDN
     luisa::unique_ptr<MetalDenoiserExt> _denoiser_ext;

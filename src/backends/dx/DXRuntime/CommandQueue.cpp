@@ -16,6 +16,15 @@ CommandQueue::CommandQueue(
         D3D12_COMMAND_QUEUE_DESC queueDesc = {};
         queueDesc.Type = type;
         queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT;
+        switch (type) {
+            case D3D12_COMMAND_LIST_TYPE_DIRECT:
+                queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_HIGH;
+                break;
+            case D3D12_COMMAND_LIST_TYPE_COMPUTE:
+            case D3D12_COMMAND_LIST_TYPE_COPY:
+                queueDesc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
+                break;
+        }
         ThrowIfFailed(device->device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(queue.GetAddressOf())));
     };
     if (device->deviceSettings) {
@@ -45,6 +54,7 @@ CommandQueue::AllocatorPtr CommandQueue::CreateAllocator(size_t maxAllocCount) {
 }
 
 void CommandQueue::AddEvent(LCEvent const *evt, uint64 fenceIdx) {
+    ++lastFrame;
     mtx.lock();
     executedAllocators.push(evt, fenceIdx, true);
     mtx.unlock();
@@ -83,6 +93,9 @@ void CommandQueue::ExecuteThread() {
                 evt->finishedEvent = std::max(fence, evt->finishedEvent);
             }
             evt->cv.notify_all();
+            if (wakeupThread) {
+                executedFrame++;
+            }
         };
         auto ExecuteHandle = [&](WaitFence) {
             device->WaitFence(cmdFence.Get(), fence);
@@ -174,7 +187,7 @@ void CommandQueue::ExecuteEmptyCallbacks(AllocatorPtr &&alloc, vstd::vector<vstd
     waitCv.notify_one();
 }
 
-void CommandQueue::ExecuteAndPresent(AllocatorPtr &&alloc, IDXGISwapChain3 *swapChain, bool vsync) {
+void CommandQueue::ExecuteAndPresent(AllocatorPtr &&alloc, IDXGISwapChain *swapChain, bool vsync) {
     auto curFrame = ++lastFrame;
     alloc->ExecuteAndPresent(this, cmdFence.Get(), curFrame, swapChain, vsync);
     mtx.lock();

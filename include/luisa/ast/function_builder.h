@@ -115,6 +115,7 @@ private:
     bool _hash_computed{false};
     bool _requires_atomic_float{false};
     bool _requires_printing{false};
+    luisa::string _name;
 
 protected:
     [[nodiscard]] static luisa::vector<FunctionBuilder *> &_function_stack() noexcept;
@@ -188,7 +189,8 @@ public:
     [[nodiscard]] static FunctionBuilder *current() noexcept;
     [[nodiscard]] static FunctionBuilder *current_or_null() noexcept;
     [[nodiscard]] static luisa::span<const FunctionBuilder *const> stack() noexcept;
-
+    
+    [[nodiscard]] auto hash_computed() const noexcept { return _hash_computed; }
     // interfaces for class Function
     /// Return a span of builtin variables.
     [[nodiscard]] auto builtin_variables() const noexcept { return luisa::span{_builtin_variables}; }
@@ -226,10 +228,16 @@ public:
     [[nodiscard]] auto variable_usage(uint uid) const noexcept { return _variable_usages[uid]; }
     /// Return block size in uint3.
     [[nodiscard]] auto block_size() const noexcept { return _block_size; }
+    /// Return name.
+    [[nodiscard]] auto name() const noexcept { return luisa::string_view{_name}; }
+    /// Return a name suitable for debugging
+    [[nodiscard]] luisa::string debug_name() const noexcept;
     /// Return hash.
     [[nodiscard]] uint64_t hash() const noexcept;
     /// Return if is raytracing.
     [[nodiscard]] bool requires_raytracing() const noexcept;
+    /// Return if requires motion blur.
+    [[nodiscard]] bool requires_motion_blur() const noexcept;
     /// Return if uses atomic operations
     [[nodiscard]] bool requires_atomic() const noexcept;
     /// Return if uses atomic floats.
@@ -262,6 +270,9 @@ public:
     // config
     /// Set block size
     void set_block_size(uint3 size) noexcept;
+
+    /// Set name
+    void set_name(luisa::string_view name) noexcept;
 
     // built-in variables
     /// Return thread id.
@@ -331,6 +342,8 @@ public:
     [[nodiscard]] const TypeIDExpr *type_id(const Type *payload) noexcept;
     /// Create cast expression
     [[nodiscard]] const CastExpr *cast(const Type *type, CastOp op, const Expression *expr) noexcept;
+    // return function reference (not supported by some backend)
+    [[nodiscard]] const FuncRefExpr *func_ref(Function custom) noexcept;
     /// Create call expression
     [[nodiscard]] const CallExpr *call(const Type *type /* nullptr for void */, CallOp call_op, std::initializer_list<const Expression *> args) noexcept;
     /// Create call expression

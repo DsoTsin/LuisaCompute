@@ -26,7 +26,7 @@ private:
     luisa::shared_ptr<detail::ContextImpl> _impl;
 
 public:
-    explicit Context(luisa::shared_ptr<luisa::compute::detail::ContextImpl> impl) noexcept;
+    explicit Context(luisa::shared_ptr<detail::ContextImpl> impl) noexcept;
     // program_path can be first arg from main entry
     explicit Context(luisa::string_view program_path) noexcept;
     explicit Context(const char *program_path) noexcept

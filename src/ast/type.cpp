@@ -516,10 +516,14 @@ uint64_t Type::hash() const noexcept {
 }
 
 size_t Type::size() const noexcept {
+    LUISA_ASSERT(!is_resource() && !is_custom(),
+                 "Trying to take size of backend-specific type.");
     return static_cast<const detail::TypeImpl *>(this)->size;
 }
 
 size_t Type::alignment() const noexcept {
+    LUISA_ASSERT(!is_resource() && !is_custom(),
+                 "Trying to take alignment of backend-specific type.");
     return static_cast<const detail::TypeImpl *>(this)->alignment;
 }
 
@@ -542,16 +546,16 @@ uint Type::dimension() const noexcept {
 bool Type::is_scalar() const noexcept {
     switch (tag()) {
         case Tag::BOOL:
-        case Tag::FLOAT32:
         case Tag::INT32:
         case Tag::UINT32:
         case Tag::INT64:
         case Tag::UINT64:
-        case Tag::FLOAT16:
         case Tag::INT16:
         case Tag::UINT16:
         case Tag::INT8:
         case Tag::UINT8:
+        case Tag::FLOAT16:
+        case Tag::FLOAT32:
         case Tag::FLOAT64:
             return true;
         default:
@@ -561,16 +565,17 @@ bool Type::is_scalar() const noexcept {
 
 bool Type::is_arithmetic() const noexcept {
     switch (tag()) {
+        case Tag::FLOAT16:
         case Tag::FLOAT32:
+        case Tag::FLOAT64:
+        case Tag::INT8:
+        case Tag::UINT8:
+        case Tag::INT16:
+        case Tag::UINT16:
         case Tag::INT32:
         case Tag::UINT32:
         case Tag::INT64:
         case Tag::UINT64:
-        case Tag::FLOAT16:
-        case Tag::INT16:
-        case Tag::UINT16:
-        case Tag::INT8:
-        case Tag::UINT8:
             return true;
         default:
             return false;
@@ -700,20 +705,26 @@ const Type *Type::custom(luisa::string_view name) noexcept {
 bool Type::is_bool() const noexcept { return tag() == Tag::BOOL; }
 bool Type::is_int32() const noexcept { return tag() == Tag::INT32; }
 bool Type::is_uint32() const noexcept { return tag() == Tag::UINT32; }
+bool Type::is_float16() const noexcept { return tag() == Tag::FLOAT16; }
 bool Type::is_float32() const noexcept { return tag() == Tag::FLOAT32; }
+bool Type::is_float64() const noexcept { return tag() == Tag::FLOAT64; }
+bool Type::is_int8() const noexcept { return tag() == Tag::INT8; }
+bool Type::is_uint8() const noexcept { return tag() == Tag::UINT8; }
 bool Type::is_int16() const noexcept { return tag() == Tag::INT16; }
 bool Type::is_uint16() const noexcept { return tag() == Tag::UINT16; }
 bool Type::is_int64() const noexcept { return tag() == Tag::INT64; }
 bool Type::is_uint64() const noexcept { return tag() == Tag::UINT64; }
-bool Type::is_float16() const noexcept { return tag() == Tag::FLOAT16; }
 
 bool Type::is_bool_vector() const noexcept { return is_vector() && element()->is_bool(); }
 bool Type::is_int32_vector() const noexcept { return is_vector() && element()->is_int32(); }
 bool Type::is_uint32_vector() const noexcept { return is_vector() && element()->is_uint32(); }
+bool Type::is_float16_vector() const noexcept { return is_vector() && element()->is_float16(); }
 bool Type::is_float32_vector() const noexcept { return is_vector() && element()->is_float32(); }
+bool Type::is_float64_vector() const noexcept { return is_vector() && element()->is_float64(); }
+bool Type::is_int8_vector() const noexcept { return is_vector() && element()->is_int8(); }
+bool Type::is_uint8_vector() const noexcept { return is_vector() && element()->is_uint8(); }
 bool Type::is_int16_vector() const noexcept { return is_vector() && element()->is_int16(); }
 bool Type::is_uint16_vector() const noexcept { return is_vector() && element()->is_uint16(); }
-bool Type::is_float16_vector() const noexcept { return is_vector() && element()->is_float16(); }
 bool Type::is_int64_vector() const noexcept { return is_vector() && element()->is_int64(); }
 bool Type::is_uint64_vector() const noexcept { return is_vector() && element()->is_uint64(); }
 

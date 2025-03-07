@@ -174,6 +174,7 @@ public:
     // copy pointer or another image's data to image
     template<typename U>
     [[nodiscard]] auto copy_from(U &&src) const noexcept { return _as_mipmap().copy_from(std::forward<U>(src)); }
+
     // DSL interface
     [[nodiscard]] auto operator->() const noexcept {
         return reinterpret_cast<const detail::VolumeExprProxy<VolumeView<T>> *>(this);

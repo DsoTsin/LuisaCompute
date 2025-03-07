@@ -580,6 +580,21 @@ void FunctionBuilder::_compute_hash() noexcept {
     _hash_computed = true;
 }
 
+luisa::string FunctionBuilder::debug_name() const noexcept {
+    auto tag_str = [this] {
+        using namespace std::string_view_literals;
+        switch (_tag) {
+            case Tag::CALLABLE: return "callable"sv;
+            case Tag::KERNEL: return "kernel"sv;
+            case Tag::RASTER_STAGE: return "raster_stage"sv;
+        }
+        return "unknown"sv;
+    }();
+    return _name.empty() ?
+               luisa::format("{}_{:016x}", tag_str, hash()) :
+               luisa::format("{}_{}_{:016x}", tag_str, _name, hash());
+}
+
 uint64_t FunctionBuilder::hash() const noexcept {
     LUISA_ASSERT(_hash_computed, "Hash not computed.");
     return _hash;
@@ -694,10 +709,32 @@ void FunctionBuilder::mark_required_curve_basis_set(CurveBasisSet basis_set) noe
 
 void FunctionBuilder::call(luisa::shared_ptr<const ExternalFunction> func,
                            luisa::span<const Expression *const> args) noexcept {
-    _void_expr(call(nullptr, std::move(func), args));
+    static_cast<void>(call(nullptr, std::move(func), args));
 }
 
 // call custom functions
+
+const FuncRefExpr *FunctionBuilder::func_ref(Function custom) noexcept {
+    if (custom.tag() != Function::Tag::CALLABLE) {
+        LUISA_ERROR_WITH_LOCATION(
+            "Calling non-callable function in device code.");
+    }
+    auto f = custom.builder();
+    auto expr = _create_expression<FuncRefExpr>(custom.builder());
+    if (auto iter = std::find_if(
+            _used_custom_callables.cbegin(), _used_custom_callables.cend(),
+            [&](auto &&p) noexcept { return f == p.get(); });
+        iter == _used_custom_callables.cend()) {
+        _used_custom_callables.emplace_back(custom.shared_builder());
+        // propagate used builtin/custom callables and constants
+        _propagated_builtin_callables.propagate(f->_propagated_builtin_callables);
+        _required_curve_bases.propagate(f->_required_curve_bases);
+        _requires_atomic_float |= f->_requires_atomic_float;
+        _requires_printing |= f->_requires_printing;
+    }
+    return expr;
+}
+
 const CallExpr *FunctionBuilder::call(const Type *type, Function custom, luisa::span<const Expression *const> args) noexcept {
     if (custom.tag() != Function::Tag::CALLABLE) {
         LUISA_ERROR_WITH_LOCATION(
@@ -837,8 +874,22 @@ void FunctionBuilder::set_block_size(uint3 size) noexcept {
     }
 }
 
+void FunctionBuilder::set_name(luisa::string_view name) noexcept {
+    _name = name;
+    // canonicalize the name
+    for (auto &c : _name) {
+        if (!isalnum(c) && c != '_') {
+            c = '_';
+        }
+    }
+}
+
 bool FunctionBuilder::requires_raytracing() const noexcept {
     return _propagated_builtin_callables.uses_raytracing();
+}
+
+bool FunctionBuilder::requires_motion_blur() const noexcept {
+    return _propagated_builtin_callables.uses_raytracing_motion_blur();
 }
 
 bool FunctionBuilder::requires_atomic() const noexcept {

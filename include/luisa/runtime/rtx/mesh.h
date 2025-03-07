@@ -1,14 +1,23 @@
 #pragma once
 
+#include <luisa/runtime/rtx/triangle.h>
+#include <luisa/runtime/rhi/resource.h>
+#include <luisa/runtime/rhi/command.h>
 #include <luisa/runtime/device.h>
 #include <luisa/runtime/buffer.h>
-#include <luisa/runtime/rtx/triangle.h>
 
 namespace luisa::compute {
 
+namespace detail {
+LC_RUNTIME_API void check_mesh_vert_align(size_t v_stride, size_t dst);
+LC_RUNTIME_API void check_mesh_vert_buffer_motion_keyframe_count(size_t total_vertex_count, uint motion_keyframe_count);
+LC_RUNTIME_API void check_mesh_triangle_buffer_offset_and_size(size_t offset_bytes, size_t size_bytes);
+LC_RUNTIME_API void check_mesh_vertex_buffer_offset_and_size(size_t offset_bytes, size_t size_bytes, size_t v_stride);
+}// namespace detail
 class Accel;
 
-// Mesh is buttom-level acceleration structure(BLAS) for ray-tracing, it present triangle-mesh only, custom intersection see ProceduralPrimitive
+// A Mesh is a bottom-level acceleration structure (BLAS) for ray-tracing with a set of triangles.
+// For custom intersection, see ProceduralPrimitive.
 class LC_RUNTIME_API Mesh final : public Resource {
 
 public:
@@ -16,13 +25,35 @@ public:
 
 private:
     uint _triangle_count{};
+    uint _motion_keyframe_count{};
     uint64_t _v_buffer{};
-    size_t _v_buffer_offset{};
-    size_t _v_buffer_size{};
+    void *_v_buffer_native_handle{};
+    size_t _v_buffer_offset_bytes{};
+    size_t _v_buffer_size_bytes{};
+    size_t _v_buffer_total_size_bytes{};
     size_t _v_stride{};
+
     uint64_t _t_buffer{};
-    size_t _t_buffer_offset{};
-    size_t _t_buffer_size{};
+    void *_t_buffer_native_handle{};
+    size_t _t_buffer_offset_bytes{};
+    size_t _t_buffer_size_bytes{};
+    size_t _t_buffer_total_size_bytes{};
+
+public:
+    // WARNING: transform buffers' data without rebuild acceleration structure is undefined behavior
+    template<typename VertexType>
+    [[nodiscard]] BufferView<VertexType> vertex_buffer() const noexcept {
+        detail::check_mesh_vert_align(_v_stride, sizeof(VertexType));
+        return {_v_buffer_native_handle, _v_buffer, sizeof(VertexType),
+                _v_buffer_offset_bytes, _v_buffer_size_bytes / sizeof(VertexType),
+                _v_buffer_total_size_bytes / sizeof(VertexType)};
+    }
+
+    [[nodiscard]] BufferView<Triangle> triangle_buffer() const noexcept {
+        return {_t_buffer_native_handle, _t_buffer, sizeof(Triangle),
+                _t_buffer_offset_bytes, _t_buffer_size_bytes / sizeof(Triangle),
+                _t_buffer_total_size_bytes / sizeof(Triangle)};
+    }
 
 private:
     friend class Device;
@@ -40,34 +71,41 @@ private:
 
 private:
     template<typename VBuffer, typename TBuffer>
-    Mesh(DeviceInterface *device, const VBuffer &vertex_buffer, const TBuffer &triangle_buffer,
-         const AccelOption &option) noexcept
-        : Resource{device, Resource::Tag::MESH,
-                   _create_resource(device, option, vertex_buffer, triangle_buffer)},
-          _triangle_count{static_cast<uint>(triangle_buffer.size())},
-          _v_buffer{BufferView{vertex_buffer}.handle()},
-          _v_buffer_offset{BufferView{vertex_buffer}.offset_bytes()},
-          _v_buffer_size{BufferView{vertex_buffer}.size_bytes()},
-          _v_stride(vertex_buffer.stride()),
-          _t_buffer{BufferView{triangle_buffer}.handle()},
-          _t_buffer_offset{BufferView{triangle_buffer}.offset_bytes()},
-          _t_buffer_size{BufferView{triangle_buffer}.size_bytes()} {}
-
-    template<typename VBuffer, typename TBuffer>
     Mesh(DeviceInterface *device,
          const VBuffer &vertex_buffer, size_t vertex_stride,
          const TBuffer &triangle_buffer,
          const AccelOption &option) noexcept
         : Resource{device, Resource::Tag::MESH,
-                   _create_resource(device, option, vertex_buffer, triangle_buffer)},
-          _triangle_count{static_cast<uint>(triangle_buffer.size())},
-          _v_buffer{BufferView{vertex_buffer}.handle()},
-          _v_buffer_offset{BufferView{vertex_buffer}.offset_bytes()},
-          _v_buffer_size{BufferView{vertex_buffer}.size_bytes()},
-          _v_stride(vertex_stride),
-          _t_buffer{BufferView{triangle_buffer}.handle()},
-          _t_buffer_offset{BufferView{triangle_buffer}.offset_bytes()},
-          _t_buffer_size{BufferView{triangle_buffer}.size_bytes()} {}
+                   _create_resource(device, option, vertex_buffer, triangle_buffer)} {
+
+        BufferView vb_view{vertex_buffer};
+        BufferView tri_view{triangle_buffer};
+        detail::check_mesh_vertex_buffer_offset_and_size(vb_view.offset_bytes(), vb_view.size_bytes(), vertex_stride);
+        detail::check_mesh_triangle_buffer_offset_and_size(tri_view.offset_bytes(), tri_view.size_bytes());
+
+        _triangle_count = static_cast<uint>(tri_view.size_bytes() / sizeof(Triangle));
+        _motion_keyframe_count = option.motion.keyframe_count;
+        detail::check_mesh_vert_buffer_motion_keyframe_count(vb_view.size_bytes() / vertex_stride, _motion_keyframe_count);
+
+        _v_buffer = vb_view.handle();
+        _v_buffer_native_handle = vb_view.native_handle();
+        _v_buffer_offset_bytes = vb_view.offset_bytes();
+        _v_buffer_size_bytes = vb_view.size_bytes();
+        _v_buffer_total_size_bytes = vb_view.total_size_bytes();
+        _v_stride = vertex_stride;
+
+        _t_buffer = tri_view.handle();
+        _t_buffer_native_handle = tri_view.native_handle();
+        _t_buffer_offset_bytes = tri_view.offset_bytes();
+        _t_buffer_size_bytes = tri_view.size_bytes();
+        _t_buffer_total_size_bytes = tri_view.total_size_bytes();
+    }
+
+    template<typename VBuffer, typename TBuffer>
+    Mesh(DeviceInterface *device,
+         const VBuffer &vertex_buffer, const TBuffer &triangle_buffer,
+         const AccelOption &option) noexcept
+        : Mesh{device, vertex_buffer, vertex_buffer.stride(), triangle_buffer, option} {}
 
 public:
     Mesh() noexcept = default;
@@ -82,9 +120,25 @@ public:
     using Resource::operator bool;
     // build triangle based bottom-level acceleration structure
     [[nodiscard]] luisa::unique_ptr<Command> build(BuildRequest request = BuildRequest::PREFER_UPDATE) noexcept;
+
     [[nodiscard]] auto triangle_count() const noexcept {
         _check_is_valid();
         return _triangle_count;
+    }
+
+    [[nodiscard]] auto motion_keyframe_count() const noexcept {
+        _check_is_valid();
+        return std::max<uint>(1u, _motion_keyframe_count);
+    }
+
+    [[nodiscard]] auto vertex_stride() const noexcept {
+        _check_is_valid();
+        return _v_stride;
+    }
+
+    [[nodiscard]] auto vertex_count_per_motion_keyframe() const noexcept {
+        auto n = this->motion_keyframe_count();
+        return _v_buffer_size_bytes / _v_stride / n;
     }
 };
 

@@ -63,7 +63,7 @@ function main(...)
 		end
 	end
 	local sb = lib.StringBuilder()
-	sb:add("lc_toolchain = {\n")
+	sb:add("lc_options = {\n")
 	local toolchain = args["toolchain"]
 	local sdk_path
 	local is_win = os.is_host("windows")
@@ -102,7 +102,6 @@ function main(...)
 	if toolchain == "llvm" and sdk_path then
 		sb:add("\tsdk = \""):add(sdk_path):add("\",\n")
 	end
-	sb:add("}\nfunction get_options()\n\treturn {\n")
 	local py = args["python"] ~= nil
 	if py then
 		args["python"] = nil
@@ -114,15 +113,15 @@ function main(...)
 		if not (v == "true" or v == "false") then
 			v = '"' .. v .. '"'
 		end
-		sb:add("\t\t"):add(k .. " = " .. v):add(',\n')
+		sb:add("\t"):add(k .. " = " .. v):add(',\n')
 	end)
 	-- python
 
 	if py and args["py_include"] == nil and os.is_host("windows") then
 		local py_path = find_process_path("python.exe")
 		if py_path then
-			sb:add("\t\tpy_include = \""):add(lib.string_replace(path.join(py_path, "include"), "\\", "/")):add(
-							"\",\n\t\tpy_linkdir = \"")
+			sb:add("\tpy_include = \""):add(lib.string_replace(path.join(py_path, "include"), "\\", "/")):add(
+							"\",\n\tpy_linkdir = \"")
 			local py_linkdir = path.join(py_path, "libs")
 			sb:add(lib.string_replace(py_linkdir, "\\", "/"))
 			local py = "python"
@@ -135,7 +134,7 @@ function main(...)
 				end
 			end
 			if #files > 0 then
-				sb:add("\t\tpy_libs = \"")
+				sb:add("\tpy_libs = \"")
 				for i, v in ipairs(files) do
 					sb:add(v .. ";")
 				end
@@ -143,7 +142,7 @@ function main(...)
 			end
 		end
 	end
-	sb:add("\t}\nend\n")
+	sb:add("}\n")
 	sb:write_to(path.join(os.scriptdir(), "options.lua"))
 	sb:dispose()
 end

@@ -4,9 +4,7 @@ if (LUISA_COMPUTE_ENABLE_CLANG_CXX)
     find_package(Clang REQUIRED CONFIG)
     add_library(luisa-compute-clangcxx SHARED ${LUISA_CLANGCXX_SOURCES})
     target_link_libraries(luisa-compute-clangcxx PUBLIC
-            luisa-compute-ast
-            luisa-compute-runtime
-            luisa-compute-vstl)
+            luisa-compute-ast luisa-compute-runtime)
     target_precompile_headers(luisa-compute-clangcxx PRIVATE src/pch.h)
     set_target_properties(luisa-compute-clangcxx PROPERTIES
             UNITY_BUILD ${LUISA_COMPUTE_ENABLE_UNITY_BUILD}

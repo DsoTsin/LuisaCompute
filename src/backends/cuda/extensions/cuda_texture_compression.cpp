@@ -69,16 +69,30 @@ inline void compress_image(CUdeviceptr src,
     }();
     auto format = [target] {
         switch (target) {
+            case PixelFormat::BC1UNorm: return nvtt::Format_BC1;
+            case PixelFormat::BC2UNorm: return nvtt::Format_BC2;
+            case PixelFormat::BC3UNorm: return nvtt::Format_BC3;
+            case PixelFormat::BC4UNorm: return nvtt::Format_BC4;
+            case PixelFormat::BC5UNorm: return nvtt::Format_BC5;
             case PixelFormat::BC6HUF16: return nvtt::Format_BC6U;
             case PixelFormat::BC7UNorm: return nvtt::Format_BC7;
             default: break;
         }
         LUISA_ERROR_WITH_LOCATION("Unsupported pixel format.");
     }();
+    auto quality = [target] {
+        switch (target) {
+            case PixelFormat::BC1UNorm: [[fallthrough]];
+            case PixelFormat::BC2UNorm: [[fallthrough]];
+            case PixelFormat::BC3UNorm: return nvtt::Quality_Highest;
+            default: break;
+        }
+        return nvtt::Quality_Normal;
+    }();
     nvtt::GPUInputBuffer buffer{&image, value_type};
     nvtt::EncodeSettings settings{
         .format = format,
-        .quality = nvtt::Quality_Normal,
+        .quality = quality,
         .encode_flags = nvtt::EncodeFlags_UseGPU | nvtt::EncodeFlags_OutputToGPUMem,
     };
     nvtt::nvtt_encode(buffer, reinterpret_cast<void *>(dst), settings);

@@ -81,7 +81,7 @@ public:
     ~CommandAllocator();
     CommandBuffer *GetBuffer() const;
     void Execute(CommandQueue *queue, ID3D12Fence *fence, uint64 fenceIndex);
-    void ExecuteAndPresent(CommandQueue *queue, ID3D12Fence *fence, uint64 fenceIndex, IDXGISwapChain3 *swapchain, bool vsync);
+    void ExecuteAndPresent(CommandQueue *queue, ID3D12Fence *fence, uint64 fenceIndex, IDXGISwapChain *swapchain, bool vsync);
     void Complete(CommandQueue *queue, ID3D12Fence *fence, uint64 fenceIndex);
     DefaultBuffer const *AllocateScratchBuffer(size_t targetSize);
     BufferView GetTempReadbackBuffer(uint64 size, size_t align = 0);

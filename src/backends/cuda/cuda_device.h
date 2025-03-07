@@ -116,11 +116,12 @@ private:
 #endif
 
 private:
-    [[nodiscard]] ShaderCreationInfo _create_shader(luisa::string name,
-                                                    const string &source, const ShaderOption &option,
-                                                    luisa::span<const char *const> nvrtc_options,
-                                                    const CUDAShaderMetadata &expected_metadata,
-                                                    luisa::vector<ShaderDispatchCommand::Argument> bound_arguments) noexcept;
+    [[nodiscard]] ShaderCreationInfo _load_or_compile_shader(
+        luisa::string name,
+        const string &source, const ShaderOption &option,
+        luisa::span<const char *const> nvrtc_options,
+        const CUDAShaderMetadata &expected_metadata,
+        luisa::vector<ShaderDispatchCommand::Argument> bound_arguments) noexcept;
 
 public:
     CUDADevice(Context &&ctx, size_t device_id, const BinaryIO *io) noexcept;
@@ -176,6 +177,8 @@ public:
     void destroy_curve(uint64_t handle) noexcept override;
     ResourceCreationInfo create_procedural_primitive(const AccelOption &option) noexcept override;
     void destroy_procedural_primitive(uint64_t handle) noexcept override;
+    [[nodiscard]] ResourceCreationInfo create_motion_instance(const AccelMotionOption &option) noexcept override;
+    void destroy_motion_instance(uint64_t handle) noexcept override;
     ResourceCreationInfo create_accel(const AccelOption &option) noexcept override;
     void destroy_accel(uint64_t handle) noexcept override;
     string query(luisa::string_view property) noexcept override;
@@ -184,4 +187,3 @@ public:
 };
 
 }// namespace luisa::compute::cuda
-

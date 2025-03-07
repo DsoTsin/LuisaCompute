@@ -9,7 +9,7 @@ namespace luisa::compute::cuda {
 
 CUDAPrimitive::CUDAPrimitive(CUDAPrimitive::Tag tag,
                              const AccelOption &option) noexcept
-    : _tag{tag}, _option{option}, _handle{} {}
+    : CUDAPrimitiveBase{tag}, _option{option} {}
 
 CUDAPrimitive::~CUDAPrimitive() noexcept {
     if (_bvh_buffer_handle) {
@@ -105,8 +105,11 @@ void CUDAPrimitive::_build(CUDACommandEncoder &encoder) noexcept {
     }
     // update handle
     LUISA_ASSERT(_handle != 0ull, "OptiX BVH build failed.");
-
     if (!_name.empty()) { nvtxRangePop(); }
+    LUISA_VERBOSE("Built CUDA primitive: handle = {}, bvh_buffer = {}, size = {}.",
+                  reinterpret_cast<void *>(_handle),
+                  reinterpret_cast<void *>(_bvh_buffer_handle),
+                  _bvh_buffer_size);
 }
 
 void CUDAPrimitive::_update(CUDACommandEncoder &encoder) noexcept {
@@ -122,14 +125,30 @@ void CUDAPrimitive::_update(CUDACommandEncoder &encoder) noexcept {
         _bvh_buffer_handle, _bvh_buffer_size, &_handle, nullptr, 0u));
     LUISA_CHECK_CUDA(cuMemFreeAsync(update_buffer, cuda_stream));
     if (!_name.empty()) { nvtxRangePop(); }
+    LUISA_VERBOSE("Updated CUDA primitive: handle = {}, bvh_buffer = {}, size = {}.",
+                  reinterpret_cast<void *>(_handle),
+                  reinterpret_cast<void *>(_bvh_buffer_handle),
+                  _bvh_buffer_size);
 }
 
-void CUDAPrimitive::set_name(luisa::string &&name) noexcept {
+const CUdeviceptr *CUDAPrimitive::_motion_buffer_pointers(CUdeviceptr base, size_t total_size) const noexcept {
+    static thread_local CUdeviceptr pointers[max_motion_keyframe_count] = {};
+    auto n = motion_keyframe_count();
+    LUISA_ASSERT(n <= max_motion_keyframe_count, "Too many motion keyframes.");
+    LUISA_ASSERT(total_size % n == 0u, "Motion buffer size is not divisible by keyframe count.");
+    auto pitch = total_size / n;
+    for (auto i = 0u; i < n; i++) {
+        pointers[i] = base + i * pitch;
+    }
+    return pointers;
+}
+
+void CUDAPrimitiveBase::set_name(luisa::string &&name) noexcept {
     std::scoped_lock lock{_mutex};
     _name = std::move(name);
 }
 
-optix::TraversableHandle CUDAPrimitive::handle() const noexcept {
+optix::TraversableHandle CUDAPrimitiveBase::handle() const noexcept {
     std::scoped_lock lock{_mutex};
     return _handle;
 }

@@ -9,7 +9,6 @@
 #include <DXRuntime/DxPtr.h>
 #include <luisa/backends/ext/dx_config_ext.h>
 #include "../../common/default_binary_io.h"
-#include "HDR.h"
 #include <luisa/backends/ext/dx_config_ext.h>
 
 namespace luisa {
@@ -82,7 +81,6 @@ public:
     
     vstd::unique_ptr<DescriptorHeap> globalHeap;
     vstd::unique_ptr<DescriptorHeap> samplerHeap;
-    vstd::optional<HDR> hdr;
     LazyLoadShader setBindlessKernel;
     LazyLoadShader setAccelKernel;
 

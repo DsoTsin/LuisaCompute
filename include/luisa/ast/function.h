@@ -127,6 +127,10 @@ public:
     [[nodiscard]] CallOpSet propagated_builtin_callables() const noexcept;
     /// Return block size
     [[nodiscard]] uint3 block_size() const noexcept;
+    /// Return name
+    [[nodiscard]] luisa::string_view name() const noexcept;
+    /// Return debug name
+    [[nodiscard]] luisa::string debug_name() const noexcept;
     /// Return function tag
     [[nodiscard]] Tag tag() const noexcept;
     /// Return return type
@@ -136,9 +140,12 @@ public:
     /// Return pointer to body statement
     [[nodiscard]] const ScopeStmt *body() const noexcept;
     /// Return hash
+    [[nodiscard]] bool hash_computed() const noexcept;
     [[nodiscard]] uint64_t hash() const noexcept;
     /// Return if is ray tracing function
     [[nodiscard]] bool requires_raytracing() const noexcept;
+    /// Return if requires motion blur
+    [[nodiscard]] bool requires_motion_blur() const noexcept;
     /// Return whether the function requires atomic operations
     [[nodiscard]] bool requires_atomic() const noexcept;
     /// Return whether the function requires atomic float operations

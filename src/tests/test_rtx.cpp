@@ -1,17 +1,11 @@
 //
 // Created by Mike Smith on 2021/6/23.
 //
+
 #include <stb/stb_image_write.h>
 
-#include <luisa/core/clock.h>
-#include <luisa/core/logging.h>
-#include <luisa/runtime/context.h>
-#include <luisa/runtime/device.h>
-#include <luisa/runtime/stream.h>
-#include <luisa/runtime/event.h>
-#include <luisa/dsl/syntax.h>
+#include <luisa/luisa-compute.h>
 #include <luisa/dsl/sugar.h>
-#include <luisa/runtime/rtx/accel.h>
 
 using namespace luisa;
 using namespace luisa::compute;
@@ -114,7 +108,7 @@ int main(int argc, char *argv[]) {
 
     auto colorspace_shader = device.compile(colorspace_kernel);
     auto raytracing_shader = device.compile(raytracing_kernel);
-    auto set_transform_shader = device.compile(set_transform_kernel);
+    auto set_transform_shader = device.compile(set_transform_kernel, {.name = "set_transforms"});
 
     static constexpr uint width = 512u;
     static constexpr uint height = 512u;

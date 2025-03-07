@@ -29,3 +29,6 @@
 [submodule "src/ext/marl"]
 	path = src/ext/marl
 	url = https://github.com/LuisaGroup/marl.git
+[submodule "src/ext/yyjson"]
+	path = src/ext/yyjson
+	url = https://github.com/ibireme/yyjson.git

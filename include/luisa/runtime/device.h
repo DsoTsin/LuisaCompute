@@ -18,6 +18,7 @@ class TimelineEvent;
 class Stream;
 class Mesh;
 class Curve;
+class MotionInstance;
 class MeshFormat;
 class ProceduralPrimitive;
 class Accel;
@@ -121,6 +122,8 @@ public:
     explicit Device(Handle handle) noexcept : _impl{std::move(handle)} {}
     // The backend name in lower case, can be used to recognize the corresponding backend
     [[nodiscard]] auto backend_name() const noexcept { return _impl->backend_name(); }
+    // The native handle, can be used by other frontend language
+    [[nodiscard]] auto native_handle() const noexcept { return _impl->native_handle(); }
     // The backend implementation, can be used by other frontend language
     [[nodiscard]] auto impl() const noexcept { return _impl.get(); }
     [[nodiscard]] auto const &impl_shared() const & noexcept { return _impl; }
@@ -165,6 +168,12 @@ public:
     template<typename AABBBuffer>
     [[nodiscard]] ProceduralPrimitive create_procedural_primitive(AABBBuffer &&aabb_buffer,
                                                                   const AccelOption &option = {}) noexcept;
+
+    // see definition in rtx/motion_instance.h
+    [[nodiscard]] MotionInstance create_motion_instance(const Mesh &mesh, const AccelMotionOption &option) noexcept;
+    [[nodiscard]] MotionInstance create_motion_instance(const Curve &curve, const AccelMotionOption &option) noexcept;
+    [[nodiscard]] MotionInstance create_motion_instance(const ProceduralPrimitive &primitive, const AccelMotionOption &option) noexcept;
+
     // see definition in rtx/accel.cpp
     [[nodiscard]] Accel create_accel(const AccelOption &option = {}) noexcept;
     // see definition in runtime/bindless_array.cpp

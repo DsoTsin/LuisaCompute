@@ -5,10 +5,14 @@
 
 #include "vulkan_instance.h"
 
+#if !defined(NDEBUG) && !defined(LUISA_PLATFORM_APPLE)
+#define LUISA_VULKAN_SWAPCHAIN_ENABLE_VALIDATION 1
+#endif
+
 namespace luisa::compute {
 
 namespace detail {
-#ifndef NDEBUG
+#if LUISA_VULKAN_SWAPCHAIN_ENABLE_VALIDATION
 static VkBool32 vulkan_validation_callback(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
                                            VkDebugUtilsMessageTypeFlagsEXT types,
                                            const VkDebugUtilsMessengerCallbackDataEXT *data,
@@ -52,7 +56,7 @@ VulkanInstance::VulkanInstance() noexcept {
     extensions.emplace_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
 #endif
 
-#ifndef NDEBUG
+#if LUISA_VULKAN_SWAPCHAIN_ENABLE_VALIDATION
     static constexpr std::array validation_layers{"VK_LAYER_KHRONOS_validation"};
     auto supports_validation = [] {
         auto layer_count = 0u;
@@ -91,7 +95,7 @@ VulkanInstance::VulkanInstance() noexcept {
     create_info.flags = ENUMERATE_PORTABILITY_BIT;
 #endif
 
-#ifndef NDEBUG
+#if LUISA_VULKAN_SWAPCHAIN_ENABLE_VALIDATION
     VkDebugUtilsMessengerCreateInfoEXT debug_create_info{};
     if (supports_validation) {
         debug_create_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
@@ -141,7 +145,7 @@ VulkanInstance::VulkanInstance() noexcept {
     volkLoadInstance(_instance);
 #endif
 
-#ifndef NDEBUG
+#if LUISA_VULKAN_SWAPCHAIN_ENABLE_VALIDATION
     if (supports_validation) {
         auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkCreateDebugUtilsMessengerEXT");
         LUISA_ASSERT(func != nullptr, "Failed to load vkCreateDebugUtilsMessengerEXT.");
@@ -152,7 +156,7 @@ VulkanInstance::VulkanInstance() noexcept {
 }
 
 VulkanInstance::~VulkanInstance() noexcept {
-#ifndef NDEBUG
+#if LUISA_VULKAN_SWAPCHAIN_ENABLE_VALIDATION
     if (_instance != nullptr) {
         if (auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(_instance, "vkDestroyDebugUtilsMessengerEXT")) {
             func(_instance, _debug_messenger, nullptr);

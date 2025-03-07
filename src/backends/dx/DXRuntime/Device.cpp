@@ -120,7 +120,7 @@ Device::Device(Context &&ctx, DeviceConfig const *settings)
                 UINT Revision;
             };
             AdapterInfo info;
-            memcpy(info.Description, desc.Description, sizeof(WCHAR) * 128);
+            std::memcpy(info.Description, desc.Description, sizeof(WCHAR) * 128);
             info.VendorId = desc.VendorId;
             info.DeviceId = desc.DeviceId;
             info.SubSysId = desc.SubSysId;
@@ -129,8 +129,10 @@ Device::Device(Context &&ctx, DeviceConfig const *settings)
         };
 
         luisa::optional<DirectXDeviceConfigExt::ExternalDevice> extDevice;
+        luisa::optional<DirectXDeviceConfigExt::GPUAllocatorSettings> allocSettings;
         if (deviceSettings) {
             extDevice = deviceSettings->CreateExternalDevice();
+            allocSettings = deviceSettings->GetGPUAllocatorSettings();
         }
         if (extDevice) {
             device = {static_cast<ID3D12Device5 *>(extDevice->device), false};
@@ -166,16 +168,26 @@ Device::Device(Context &&ctx, DeviceConfig const *settings)
             }
             if (index == std::numeric_limits<size_t>::max()) {
                 index = 0;
+                size_t max_score = 0;
                 for (size_t i = 0; i < device_names.size(); ++i) {
                     luisa::string &device_name = device_names[i];
+                    size_t score = 0;
                     if (device_name.find("geforce") != luisa::string::npos ||
-                        device_name.find("radeon") != luisa::string::npos ||
-                        device_name.find("arc") != luisa::string::npos) {
-                        LUISA_INFO("Select device: {}", device_name);
+                        device_name.find("radeon") != luisa::string::npos) {
+                        score += 1;
+                    }
+                    if (device_name.find("gtx") != luisa::string::npos ||
+                        device_name.find("rtx") != luisa::string::npos ||
+                        device_name.find("arc") != luisa::string::npos ||
+                        device_name.find("rx") != luisa::string::npos) {
+                        score += 10;
+                    }
+                    if (score > max_score) {
                         index = i;
-                        break;
+                        max_score = score;
                     }
                 }
+                LUISA_INFO("Select device: {}", device_names[index]);
             }
             auto &device_name = device_names[index];
 
@@ -208,15 +220,23 @@ Device::Device(Context &&ctx, DeviceConfig const *settings)
             bool sameAdaptor = false;
             if (adapterIdStream) {
                 auto blob = adapterIdStream->read(~0ull);
-                sameAdaptor = blob.size() == sizeof(vstd::MD5) && memcmp(blob.data(), &adapterID, sizeof(vstd::MD5)) == 0;
+                sameAdaptor = blob.size() == sizeof(vstd::MD5) && std::memcmp(blob.data(), &adapterID, sizeof(vstd::MD5)) == 0;
             }
             if (!sameAdaptor) {
                 LUISA_INFO("Adapter mismatch, shader cache cleared.");
                 fileIo->clear_shader_cache();
             }
-            fileIo->write_shader_cache("dx_adapterid", {reinterpret_cast<std::byte const *>(&adapterID), sizeof(vstd::MD5)});
+            static_cast<void>(fileIo->write_shader_cache("dx_adapterid", {reinterpret_cast<std::byte const *>(&adapterID), sizeof(vstd::MD5)}));
         }
-        defaultAllocator = vstd::make_unique<GpuAllocator>(this, profiler);
+        if (allocSettings)
+            defaultAllocator = vstd::make_unique<GpuAllocator>(
+                this,
+                profiler,
+                allocSettings->preferred_block_size,
+                allocSettings->sparse_buffer_block_size,
+                allocSettings->sparse_image_block_size);
+        else
+            defaultAllocator = vstd::make_unique<GpuAllocator>(this, profiler, 0, 0, 0);
         allocatorInterface.device = this;
         globalHeap = vstd::create_unique(
             new DescriptorHeap(
@@ -230,7 +250,6 @@ Device::Device(Context &&ctx, DeviceConfig const *settings)
                 D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER,
                 16,
                 true));
-        hdr.create(dxgiFactory.Get(), adapter.Get());
         auto samplers = GlobalSamplers::GetSamplers();
         for (auto i : vstd::range(samplers.size())) {
             samplerHeap->CreateSampler(

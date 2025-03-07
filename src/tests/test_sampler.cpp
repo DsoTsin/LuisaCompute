@@ -77,7 +77,6 @@ int main(int argc, char *argv[]) {
 
     stream << fill_image(heap, device_image).dispatch(make_uint2(1024u))
            << device_image.copy_to(host_image.data())
-           << event.signal()
            << synchronize();
 
     stbi_write_png("result.png", 1024u, 1024u, 4u, host_image.data(), 0u);

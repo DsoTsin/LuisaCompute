@@ -120,9 +120,10 @@ LC_AST_API TypePromotion promote_types(BinaryOp op, const Type *lhs, const Type 
     }
     // otherwise, must be matrix * vector
     LUISA_ASSERT(lhs->is_matrix() && rhs->is_vector() &&
-                 lhs->dimension() == rhs->dimension(),
+                     lhs->dimension() == rhs->dimension(),
                  "Invalid operand types '{}' and '{}' "
-                 "for binary operation.");
+                 "for binary operation.",
+                 lhs->description(), rhs->description());
     auto v = Type::vector(Type::of<float>(), lhs->dimension());
     return {.lhs = lhs,
             .rhs = v,

@@ -33,7 +33,7 @@ template<>
 struct fmt::formatter<Test> {
     constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
     template<typename FormatContext>
-    auto format(const Test &t, FormatContext &ctx) {
+    auto format(const Test &t, FormatContext &ctx) const {
         return fmt::format_to(ctx.out(),
                               "Test{{"
                               "a={}, "
@@ -196,4 +196,3 @@ int main(int argc, char *argv[]) {
     test_texture<uint>(device, PixelStorage::INT2, make_uint3(233u, 666u, 45u), rand);
     test_texture<uint>(device, PixelStorage::INT4, make_uint3(233u, 666u, 45u), rand);
 }
-

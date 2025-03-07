@@ -28,11 +28,15 @@ CUDAHostBufferPool::View *CUDAHostBufferPool::allocate(size_t size, bool fallbac
         return node ? View::create(node, this) : nullptr;
     }();
     if (view == nullptr) [[unlikely]] {
-        LUISA_WARNING_WITH_LOCATION(
-            "Failed to allocate {} bytes from "
-            "CUDAHostBufferPool. Falling back "
-            "to ad-hoc allocation.",
-            size);
+        static thread_local bool warned = false;
+        if (!warned) {
+            LUISA_WARNING_WITH_LOCATION(
+                "Failed to allocate {} bytes from CUDAHostBufferPool. "
+                "Falling back to ad-hoc allocation. Consecutive warnings "
+                "would be suppressed to avoid flooding.",
+                size);
+            warned = true;
+        }
         if (fallback_if_failed) {
             view = View::create(luisa::allocate_with_allocator<std::byte>(size));
         }

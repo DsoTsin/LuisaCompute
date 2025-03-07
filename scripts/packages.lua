@@ -1,8 +1,9 @@
 local _sdks = {
     dx_sdk = {
-        sha256 = "f6550326041f947b8f5b9a9fdcfa1dacd8345335a71f589c85b6e20fc9ed1b17",
-        name = 'dx_sdk.zip',
-        -- address = 
+        -- from:
+        --> xmake l hash.sha256 SDKs/x64/dx_sdk_20240920.zip
+        sha256 = "009f140909cd81b6994b7e24635f72275e57c7c4c026c764c8b6ac263cd762dd",
+        name = 'dx_sdk_20240920.zip',
     }
 }
 

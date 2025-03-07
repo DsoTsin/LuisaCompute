@@ -281,6 +281,68 @@ public:
         // create main swapchain
         _rebuild_swapchain_if_changed(_main_window, _main_swapchain, _main_framebuffer);
 
+        // create texture array
+        _texture_array = _device.create_bindless_array();
+
+        // create shaders
+        _clear_shader = _device.compile<2>([](ImageFloat fb, Float3 color) noexcept {
+            auto tid = dispatch_id().xy();
+            fb.write(tid, make_float4(color, 1.f));
+        });
+        _render_shader = _device.compile<2>([ssaa = config.ssaa](ImageFloat fb, UInt2 offset, AccelVar accel,
+                                                                 BufferVar<Triangle> triangles, BufferVar<Vertex> vertices,
+                                                                 BindlessVar texture_array, BufferFloat4 clip_rects) noexcept {
+            auto tid = offset + dispatch_id().xy();
+            $if (all(tid < dispatch_size().xy())) {
+                constexpr auto eps = 1e-4f;// slightly offset the center to improve watertightness
+                auto offsets = ssaa ?
+                                   luisa::vector<float2>{
+                                       make_float2(1.f / 3.f + eps, 1.f / 3.f - eps),
+                                       make_float2(2.f / 3.f + eps, 1.f / 3.f + eps),
+                                       make_float2(2.f / 3.f - eps, 2.f / 3.f + eps),
+                                       make_float2(1.f / 3.f - eps, 2.f / 3.f - eps),
+                                   } :
+                                   luisa::vector<float2>{make_float2(.5f + eps, .5f - eps)};
+                auto k = static_cast<float>(1. / static_cast<double>(offsets.size()));
+                auto sum = def(make_float3(0.f));
+                auto old = fb.read(tid).xyz();
+                for (auto offset : offsets) {
+                    auto o = make_float3(make_float2(tid) + offset, -1.f);
+                    auto d = make_float3(0.f, 0.f, 1.f);
+                    auto ray = make_ray(o, d);
+                    auto beta = def(1.f);
+                    auto depth = def(0u);
+                    $while (beta > 1e-3f & depth < 16u) {
+                        depth += 1u;
+                        auto hit = accel.intersect(ray, {});
+                        $if (!hit->is_triangle()) { $break; };
+                        auto triangle = triangles->read(hit.prim);
+                        auto v0 = vertices->read(triangle.i0);
+                        auto v1 = vertices->read(triangle.i1);
+                        auto v2 = vertices->read(triangle.i2);
+                        auto p = hit->triangle_interpolate(v0->p(), v1->p(), v2->p());
+                        auto clip = clip_rects->read(v0.clip_idx);
+                        $if (all(p.xy() >= clip.xy() && p.xy() <= clip.zw())) {
+                            auto uv = hit->triangle_interpolate(v0.uv, v1.uv, v2.uv);
+                            auto c = hit->triangle_interpolate(v0->color(), v1->color(), v2->color());
+                            auto tex_id = v0.tex_id;
+                            $if (tex_id != 0u) {
+                                c *= texture_array->tex2d(v0.tex_id).sample(uv);
+                            };
+                            sum += k * c.xyz() * beta * c.w;
+                            beta *= 1.f - c.w;
+                        };
+                        // step through the layer
+                        auto pp = p + make_float3(0.f, 0.f, depth_peeling_step * .5);
+                        ray = make_ray(pp, d);
+                    };
+                    // accumulate the background
+                    sum += k * beta * old;
+                }
+                fb.write(tid, make_float4(sum, 1.f));
+            };
+        });
+
         // TODO: install user GLFW callbacks?
 
         // imgui config
@@ -342,68 +404,6 @@ public:
                     }
                 };
             }
-        });
-
-        // create texture array
-        _texture_array = _device.create_bindless_array();
-
-        // create shaders
-        _clear_shader = _device.compile<2>([](ImageFloat fb, Float3 color) noexcept {
-            auto tid = dispatch_id().xy();
-            fb.write(tid, make_float4(color, 1.f));
-        });
-        _render_shader = _device.compile<2>([ssaa = config.ssaa](ImageFloat fb, UInt2 offset, AccelVar accel,
-                                                                 BufferVar<Triangle> triangles, BufferVar<Vertex> vertices,
-                                                                 BindlessVar texture_array, BufferFloat4 clip_rects) noexcept {
-            auto tid = offset + dispatch_id().xy();
-            $if (all(tid < dispatch_size().xy())) {
-                constexpr auto eps = 1e-4f;// slightly offset the center to improve watertightness
-                auto offsets = ssaa ?
-                                   luisa::vector<float2>{
-                                       make_float2(1.f / 3.f + eps, 1.f / 3.f - eps),
-                                       make_float2(2.f / 3.f + eps, 1.f / 3.f + eps),
-                                       make_float2(2.f / 3.f - eps, 2.f / 3.f + eps),
-                                       make_float2(1.f / 3.f - eps, 2.f / 3.f - eps),
-                                   } :
-                                   luisa::vector<float2>{make_float2(.5f + eps, .5f - eps)};
-                auto k = static_cast<float>(1. / static_cast<double>(offsets.size()));
-                auto sum = def(make_float3(0.f));
-                auto old = fb.read(tid).xyz();
-                for (auto offset : offsets) {
-                    auto o = make_float3(make_float2(tid) + offset, -1.f);
-                    auto d = make_float3(0.f, 0.f, 1.f);
-                    auto ray = make_ray(o, d);
-                    auto beta = def(1.f);
-                    auto depth = def(0u);
-                    $while (beta > 1e-3f & depth < 64u) {
-                        depth += 1u;
-                        auto hit = accel.intersect(ray, {});
-                        $if (!hit->is_triangle()) { $break; };
-                        auto triangle = triangles->read(hit.prim);
-                        auto v0 = vertices->read(triangle.i0);
-                        auto v1 = vertices->read(triangle.i1);
-                        auto v2 = vertices->read(triangle.i2);
-                        auto p = hit->triangle_interpolate(v0->p(), v1->p(), v2->p());
-                        auto clip = clip_rects->read(v0.clip_idx);
-                        $if (all(p.xy() >= clip.xy() && p.xy() <= clip.zw())) {
-                            auto uv = hit->triangle_interpolate(v0.uv, v1.uv, v2.uv);
-                            auto c = hit->triangle_interpolate(v0->color(), v1->color(), v2->color());
-                            auto tex_id = v0.tex_id;
-                            $if (tex_id != 0u) {
-                                c *= texture_array->tex2d(v0.tex_id).sample(uv);
-                            };
-                            sum += k * c.xyz() * beta * c.w;
-                            beta *= 1.f - c.w;
-                        };
-                        // step through the layer
-                        auto pp = p + make_float3(0.f, 0.f, depth_peeling_step * .5);
-                        ray = make_ray(pp, d);
-                    };
-                    // accumulate the background
-                    sum += k * beta * old;
-                }
-                fb.write(tid, make_float4(sum, 1.f));
-            };
         });
     }
 
@@ -493,7 +493,7 @@ private:
         }
         _stream << _font_texture.copy_from(pixels);
         auto tex_id = register_texture(_font_texture, Sampler::linear_point_edge());
-        io.Fonts->SetTexID(reinterpret_cast<ImTextureID>(tex_id));
+        io.Fonts->SetTexID(tex_id);
     }
 
 private:
@@ -513,7 +513,7 @@ private:
         if (!_accel) {
             _accel = _device.create_accel(o);
             _mesh_handle = _device.impl()->create_mesh(o).handle;
-            _accel.emplace_back(_mesh_handle);
+            _accel.emplace_back_handle(_mesh_handle, make_float4x4(1.f), 0xffu, true, 0u);
         }
         if (!_vertex_buffer) { _vertex_buffer = _device.create_buffer<Vertex>(std::max(next_pow2(_vertices.size()), 64_k)); }
         if (!_triangle_buffer) { _triangle_buffer = _device.create_buffer<Triangle>(std::max(next_pow2(_triangles.size()), 64_k)); }
@@ -601,7 +601,7 @@ private:
                     auto clip_idx = static_cast<uint>(_clip_rects.size());
                     _clip_rects.emplace_back(make_float4(clip_min, clip_max));
                     auto tex_id = [this, cmd] {
-                        auto t = reinterpret_cast<uint64_t>(cmd->TextureId);
+                        auto t = cmd->TextureId;
                         if (t != 0u && !_active_textures.contains(t)) {
                             LUISA_WARNING_WITH_LOCATION(
                                 "Using an unregistered texture (id = {}). "

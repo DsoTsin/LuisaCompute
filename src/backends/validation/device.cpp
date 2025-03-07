@@ -6,6 +6,8 @@
 #include "texture.h"
 #include "bindless_array.h"
 #include "mesh.h"
+#include "curve.h"
+#include "motion_instance.h"
 #include "procedural_primitives.h"
 #include "shader.h"
 #include "sparse_heap.h"
@@ -14,10 +16,14 @@
 #include "raster_ext_impl.h"
 #include "dstorage_ext_impl.h"
 #include "pinned_mem_impl.h"
+#include "dx_hdr_ext_impl.h"
+#include "native_res_ext_impl.h"
 #include <luisa/core/logging.h>
 #include <luisa/runtime/rhi/command.h>
 #include <luisa/backends/ext/registry.h>
+
 namespace lc::validation {
+
 static vstd::unordered_map<uint64_t, StreamOption> stream_options;
 static std::mutex stream_mtx;
 
@@ -27,6 +33,19 @@ Device::Device(Context &&ctx, luisa::shared_ptr<DeviceInterface> &&native) noexc
     auto raster_ext = static_cast<RasterExt *>(_native->extension(RasterExt::name));
     auto dstorage_ext = static_cast<DStorageExt *>(_native->extension(DStorageExt::name));
     auto pinned_ext = static_cast<PinnedMemoryExt *>(_native->extension(PinnedMemoryExt::name));
+    auto native_res_ext = static_cast<NativeResourceExt *>(_native->extension(NativeResourceExt::name));
+    auto dx_hdr_ext = static_cast<DXHDRExt *>(_native->extension(DXHDRExt::name));
+    if (dx_hdr_ext) {
+        auto impl = new DXHDRExtImpl(dx_hdr_ext);
+        exts.try_emplace(
+            DXHDRExt::name,
+            ExtPtr{
+                impl,
+                detail::ext_deleter<DeviceExtension>{
+                    [](DeviceExtension *ptr) {
+                        delete static_cast<DXHDRExtImpl *>(ptr);
+                    }}});
+    }
     if (raster_ext) {
         auto raster_impl = new RasterExtImpl(raster_ext);
         exts.try_emplace(
@@ -55,6 +74,16 @@ Device::Device(Context &&ctx, luisa::shared_ptr<DeviceInterface> &&native) noexc
                 pinned_ext_impl,
                 detail::ext_deleter<DeviceExtension>{[](DeviceExtension *ptr) {
                     delete static_cast<PinnedMemoryExtImpl *>(ptr);
+                }}});
+    }
+    if (native_res_ext) {
+        auto native_res_ext_impl = new NativeResourceExtImpl(this, native_res_ext);
+        exts.try_emplace(
+            NativeResourceExt::name,
+            ExtPtr{
+                native_res_ext_impl,
+                detail::ext_deleter<DeviceExtension>{[](DeviceExtension *ptr) {
+                    delete static_cast<NativeResourceExtImpl *>(ptr);
                 }}});
     }
 }
@@ -260,6 +289,28 @@ ResourceCreationInfo Device::create_mesh(
 void Device::destroy_mesh(uint64_t handle) noexcept {
     RWResource::dispose(handle);
     _native->destroy_mesh(handle);
+}
+
+ResourceCreationInfo Device::create_curve(const AccelOption &option) noexcept {
+    auto curve = _native->create_curve(option);
+    new Curve(curve.handle);
+    return curve;
+}
+
+void Device::destroy_curve(uint64_t handle) noexcept {
+    RWResource::dispose(handle);
+    _native->destroy_curve(handle);
+}
+
+ResourceCreationInfo Device::create_motion_instance(const AccelMotionOption &option) noexcept {
+    auto motion = _native->create_motion_instance(option);
+    new MotionInstance(motion.handle);
+    return motion;
+}
+
+void Device::destroy_motion_instance(uint64_t handle) noexcept {
+    RWResource::dispose(handle);
+    _native->destroy_motion_instance(handle);
 }
 
 ResourceCreationInfo Device::create_procedural_primitive(

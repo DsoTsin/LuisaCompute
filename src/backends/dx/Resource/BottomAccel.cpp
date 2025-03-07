@@ -125,12 +125,18 @@ size_t BottomAccel::PreProcessStates(
     device->device->GetRaytracingAccelerationStructurePrebuildInfo(
         &bottomInput,
         &bottomLevelPrebuildInfo);
+    // workaround driver bug
+    if (RequireCompact() && device->gpuType == Device::GpuType::NVIDIA) {
+        bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes += 65536;
+    }
     auto SetAccelBuffer = [&] {
         accelBuffer = vstd::create_unique(new DefaultBuffer(
             device,
             CalcAlign(bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, 65536),
             device->defaultAllocator.get(),
-            D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE));
+            D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+            false,
+            "blas-accel-buffer"));
     };
     if (!accelBuffer) {
         update = false;
@@ -163,7 +169,9 @@ bool BottomAccel::CheckAccel(
         device,
         CalcAlign(compactSize, 65536),
         device->defaultAllocator.get(),
-        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE));
+        D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE,
+        false,
+        "blas-accel-buffer"));
     builder.GetCB()->CmdList()->CopyRaytracingAccelerationStructure(
         newAccelBuffer->GetAddress(),
         accelBuffer->GetAddress(),
@@ -194,8 +202,8 @@ void BottomAccel::UpdateStates(
             &accelData.bottomStruct,
             0,
             nullptr);
-        tracker.RecordState(GetAccelBuffer(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
     }
+    tracker.RecordState(GetAccelBuffer(), D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE);
 }
 void BottomAccel::FinalCopy(
     CommandBufferBuilder &builder,

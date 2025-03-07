@@ -63,10 +63,13 @@ const luisa::compute::Type *TypeDatabase::findType(const clang::QualType Ty) {
 
 const luisa::compute::Type *TypeDatabase::FindOrAddType(const clang::QualType Ty, const clang::SourceLocation &loc) {
     const bool isPointer = Ty->isPointerType();
+    const bool isFunctionPointer = Ty->isFunctionPointerType();
     const bool isUnion = Ty->isUnionType();
     if (isPointer || isUnion) {
         loc.dump(GetASTContext()->getSourceManager());
         Ty->dump();
+        if (isFunctionPointer)
+            return luisa::compute::Type::of<uint64>();
         if (isPointer)
             clangcxx_log_error("pointer types are banned!");
         if (isUnion)
@@ -282,9 +285,9 @@ const luisa::compute::Type *TypeDatabase::RecordAsBuiltinType(const QualType Ty)
     }
 
     if (ext_builtin) {
-        const auto is_image = builtin_type_name.startswith("image");
-        const auto is_volume = builtin_type_name.startswith("volume");
-        const auto is_buffer = builtin_type_name.startswith("buffer");
+        const auto is_image = builtin_type_name.starts_with("image");
+        const auto is_volume = builtin_type_name.starts_with("volume");
+        const auto is_buffer = builtin_type_name.starts_with("buffer");
         if (builtin_type_name == "vec") {
             if (auto TSD = GetClassTemplateSpecializationDecl(Ty)) {
                 auto &Arguments = TSD->getTemplateArgs();

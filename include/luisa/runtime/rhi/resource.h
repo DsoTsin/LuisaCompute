@@ -60,7 +60,6 @@ struct SwapchainCreationInfo : public ResourceCreationInfo {
 };
 
 struct ShaderCreationInfo : public ResourceCreationInfo {
-    // luisa::string name;
     uint3 block_size;
 
     [[nodiscard]] static auto make_invalid() noexcept {
@@ -98,10 +97,36 @@ struct AccelOption {
         FAST_BUILD // optimize for frequent rebuild
     };
 
+    enum struct MotionMode : uint8_t {
+        MATRIX,
+        SRT,
+    };
+
+    struct Motion {
+        uint keyframe_count{0};         // <= 1 means no motion blur, otherwise the number of keyframes in [time_start, time_end]
+        float time_start{0.f};          // the start time of the motion blur effect
+        float time_end{1.f};            // the end time of the motion blur effect
+        bool should_vanish_start{false};// whether the object should vanish before time_start
+        bool should_vanish_end{false};  // whether the object should vanish after time_end
+
+        using Mode = MotionMode;
+        Mode mode{};// only valid for motion blur geometry
+
+        [[nodiscard]] constexpr auto is_enabled() const noexcept { return keyframe_count > 1; }
+        [[nodiscard]] constexpr explicit operator bool() const noexcept { return is_enabled(); }
+    };
+
     UsageHint hint{UsageHint::FAST_TRACE};
     bool allow_compaction{true};
     bool allow_update{false};
+
+    // motion blur
+    Motion motion;
 };
+
+using AccelUsageHint = AccelOption::UsageHint;
+using AccelMotionOption = AccelOption::Motion;
+using AccelMotionMode = AccelMotionOption::Mode;
 
 /// \brief Options for shader creation.
 struct ShaderOption {
@@ -157,6 +182,7 @@ public:
         MESH,
         CURVE,
         PROCEDURAL_PRIMITIVE,
+        MOTION_INSTANCE,
         ACCEL,
         STREAM,
         EVENT,
@@ -217,7 +243,7 @@ protected:
     // protected destructor for derived classes
 
 public:
-    virtual ~Resource() noexcept = default;
+    virtual ~Resource() noexcept;
     Resource(const Resource &) noexcept = delete;
     Resource &operator=(Resource &&) noexcept = delete;// use _move_from in derived classes
     Resource &operator=(const Resource &) noexcept = delete;
@@ -229,6 +255,7 @@ public:
     [[nodiscard]] auto valid() const noexcept { return _info.valid(); }
     [[nodiscard]] explicit operator bool() const noexcept { return valid(); }
     void set_name(luisa::string_view name) const noexcept;
+    void dispose() noexcept;
 };
 
 }// namespace luisa::compute

@@ -33,8 +33,8 @@ int main(int argc, char *argv[]) {
     uint state = 0;
     for (int i = 0; i < count; i++) {
         float3 pos = make_float3(lcg(state) * 2.f - 1.f, lcg(state) * 2.f - 1.f, lcg(state) * 2.f - 1.f) * 10.f;
-        float3 max = pos + radius;
-        float3 min = pos - radius;
+        float3 max = pos + radius + 1e-3f;
+        float3 min = pos - radius - 1e-3f;
         aabbs[i].packed_max = {max.x, max.y, max.z};
         aabbs[i].packed_min = {min.x, min.y, min.z};
     }

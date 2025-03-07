@@ -7,7 +7,14 @@
 #include <luisa/core/logging.h>
 namespace lc::dx {
 namespace RasterShaderDetail {
-static constexpr bool PRINT_CODE = false;
+static const bool PRINT_CODE = ([] {
+    // read env LUISA_DUMP_SOURCE
+    auto env = std::getenv("LUISA_DUMP_SOURCE");
+    if (env == nullptr) {
+        return false;
+    }
+    return std::string_view{env} == "1";
+})();
 static vstd::vector<SavedArgument> GetKernelArgs(Function vertexKernel, Function pixelKernel) {
     if (vertexKernel.builder() == nullptr || pixelKernel.builder() == nullptr) {
         return {};
@@ -61,7 +68,7 @@ void RasterShader::GetMeshFormatState(
         "TEXCOORD"};
     static auto SemanticIndex = {0u, 0u, 0u, 0u, 0u, 1u, 2u, 3u};
     vstd::fixed_vector<uint, 4> offsets(meshFormat.vertex_stream_count());
-    memset(offsets.data(), 0, offsets.size_bytes());
+    std::memset(offsets.data(), 0, offsets.size_bytes());
     for (auto i : vstd::range(meshFormat.vertex_stream_count())) {
         auto vec = meshFormat.attributes(i);
         for (auto &&attr : vec) {
@@ -278,7 +285,7 @@ RasterShader *RasterShader::CompileRaster(
         if (str.useBufferBindless) bdlsBufferCount++;
         if (str.useTex2DBindless) bdlsBufferCount++;
         if (str.useTex3DBindless) bdlsBufferCount++;
-        if constexpr (RasterShaderDetail::PRINT_CODE) {
+        if (RasterShaderDetail::PRINT_CODE) {
             auto f = fopen("hlsl_output.hlsl", "wb");
             fwrite(str.result.data(), str.result.size(), 1, f);
             fclose(f);
@@ -300,7 +307,7 @@ RasterShader *RasterShader::CompileRaster(
         auto GetVector = [&](ComPtr<IDxcBlob> &blob) {
             vstd::vector<std::byte> vec;
             vec.push_back_uninitialized(blob->GetBufferSize());
-            memcpy(vec.data(), blob->GetBufferPointer(), blob->GetBufferSize());
+            std::memcpy(vec.data(), blob->GetBufferPointer(), blob->GetBufferSize());
             return vec;
         };
         auto vertBin = GetVector(compResult.vertex.get<0>());
@@ -349,7 +356,7 @@ void RasterShader::SaveRaster(
     Function pixelKernel,
     uint shaderModel,
     bool enableUnsafeMath) {
-    if constexpr (RasterShaderDetail::PRINT_CODE) {
+    if (RasterShaderDetail::PRINT_CODE) {
         auto f = fopen("hlsl_output.hlsl", "ab");
         fwrite(str.result.data(), str.result.size(), 1, f);
         fclose(f);
@@ -406,7 +413,7 @@ ID3D12PipelineState *RasterShader::GetPSO(
     RasterPSOState psoState;
     psoState.rtvFormats.push_back_uninitialized(rtvFormats.size());
     if (!rtvFormats.empty()) {
-        memcpy(psoState.rtvFormats.data(), rtvFormats.data(), rtvFormats.size_bytes());
+        std::memcpy(psoState.rtvFormats.data(), rtvFormats.data(), rtvFormats.size_bytes());
     }
     psoState.dsvFormat = dsvFormat;
     psoState.rasterState = rasterState;
@@ -423,13 +430,13 @@ ID3D12PipelineState *RasterShader::GetPSO(
     auto push = [&]<typename T>(T const &t) {
         auto sz = md5Bytes.size();
         md5Bytes.push_back_uninitialized(sizeof(T));
-        memcpy(md5Bytes.data() + sz, &t, sizeof(T));
+        std::memcpy(md5Bytes.data() + sz, &t, sizeof(T));
     };
     auto pushArray = [&]<typename T>(T const *ptr, size_t size) {
         auto sz = md5Bytes.size();
         auto byteSize = size * sizeof(T);
         md5Bytes.push_back_uninitialized(byteSize);
-        memcpy(md5Bytes.data() + sz, ptr, byteSize);
+        std::memcpy(md5Bytes.data() + sz, ptr, byteSize);
     };
     pushArray(psoState.rtvFormats.data(), psoState.rtvFormats.size());
     push(psoState.dsvFormat);

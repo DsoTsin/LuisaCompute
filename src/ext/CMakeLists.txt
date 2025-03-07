@@ -39,12 +39,12 @@ set(SPDLOG_FMT_EXTERNAL_HO OFF CACHE BOOL "" FORCE)
 set(SPDLOG_DISABLE_DEFAULT_LOGGER ON CACHE BOOL "" FORCE)
 add_subdirectory(spdlog)
 target_compile_definitions(spdlog_header_only INTERFACE
-        FMT_CONSTEVAL=constexpr
+        FMT_USE_CONSTEVAL=0
         FMT_EXCEPTIONS=0
         FMT_HEADER_ONLY=1
         FMT_USE_NOEXCEPT=1)
 target_compile_definitions(spdlog PUBLIC
-        FMT_CONSTEVAL=constexpr
+        FMT_USE_CONSTEVAL=0
         FMT_EXCEPTIONS=0
         FMT_HEADER_ONLY=1
         FMT_USE_NOEXCEPT=1)
@@ -64,23 +64,24 @@ luisa_compute_install_extension(xxhash HEADER_FILES
         xxHash/xxhash.h
         HEADER_DESTINATION xxHash)
 
+# stb
 add_subdirectory(stb)
-target_link_libraries(luisa-compute-ext INTERFACE stb)
-set_target_properties(stb PROPERTIES OUTPUT_NAME lc-ext-stb)
-luisa_compute_install_extension(stb HEADER_FILES
+target_link_libraries(luisa-compute-ext INTERFACE luisa-compute-ext-stb-interface)
+
+luisa_compute_install_extension(luisa-compute-ext-stb-interface HEADER_FILES
         stb/stb/stb_image.h
         stb/stb/stb_image_resize2.h
         stb/stb/stb_image_write.h
         HEADER_DESTINATION stb)
 
+# magic enum
 add_library(magic_enum INTERFACE)
 target_include_directories(magic_enum INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/magic_enum/include>)
 target_link_libraries(luisa-compute-ext INTERFACE magic_enum)
 luisa_compute_install_extension(magic_enum INCLUDE magic_enum/include/magic_enum)
 
+# glfw
 if (LUISA_COMPUTE_ENABLE_GUI)
-
-    # glfw
     if (UNIX AND NOT APPLE)
         set(GLFW_BUILD_WAYLAND ${LUISA_COMPUTE_ENABLE_WAYLAND} CACHE BOOL "" FORCE)
     endif ()
@@ -93,58 +94,19 @@ if (LUISA_COMPUTE_ENABLE_GUI)
     set_target_properties(glfw PROPERTIES OUTPUT_NAME lc-ext-glfw)
     target_link_libraries(luisa-compute-ext INTERFACE glfw)
     luisa_compute_install_extension(glfw)
-
-    # imgui
-    set(LUISA_IMGUI_SOURCES
-            imgui/imgui.cpp
-            imgui/imgui_demo.cpp
-            imgui/imgui_draw.cpp
-            imgui/imgui_tables.cpp
-            imgui/imgui_widgets.cpp
-            imgui/backends/imgui_impl_glfw.cpp)
-    set(LUISA_IMGUI_HEADERS
-            imgui/imconfig.h
-            imgui/imgui.h
-            imgui/imgui_internal.h
-            imgui/imstb_rectpack.h
-            imgui/imstb_textedit.h
-            imgui/imstb_truetype.h
-            imgui/backends/imgui_impl_glfw.h)
-    add_library(luisa-compute-ext-imgui SHARED
-            ${LUISA_IMGUI_SOURCES}
-            ${LUISA_IMGUI_HEADERS})
-    set_target_properties(luisa-compute-ext-imgui PROPERTIES
-            UNITY_BUILD ${LUISA_COMPUTE_ENABLE_UNITY_BUILD}
-            OUTPUT_NAME lc-ext-imgui
-            PUBLIC_HEADER "${LUISA_IMGUI_HEADERS}")
-    target_compile_definitions(luisa-compute-ext-imgui PUBLIC GLFW_INCLUDE_NONE)
-    if (WIN32)
-        target_compile_definitions(luisa-compute-ext-imgui PRIVATE
-                "IMGUI_API=__declspec(dllexport)"
-                "IMGUI_IMPL_API=__declspec(dllexport)")
-    endif ()
-    target_link_libraries(luisa-compute-ext-imgui PUBLIC glfw)
-    target_include_directories(luisa-compute-ext-imgui PUBLIC
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/imgui>
-            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends>)
-    luisa_compute_install_extension(luisa-compute-ext-imgui)
-    target_link_libraries(luisa-compute-ext INTERFACE luisa-compute-ext-imgui)
-
 endif ()
 
 add_subdirectory(EASTL)
-set_target_properties(EASTL PROPERTIES
-        UNITY_BUILD ${LUISA_COMPUTE_ENABLE_UNITY_BUILD}
-        OUTPUT_NAME lc-ext-eastl)
-target_link_libraries(luisa-compute-ext INTERFACE EASTL)
-luisa_compute_install_extension(EASTL INCLUDE EASTL/include/EASTL)
+set_target_properties(EASTL-object PROPERTIES UNITY_BUILD ${LUISA_COMPUTE_ENABLE_UNITY_BUILD})
+target_link_libraries(luisa-compute-ext INTERFACE EASTL-interface)
+luisa_compute_install_extension(EASTL-interface INCLUDE EASTL/include/EASTL)
 luisa_compute_install_extension(EABase INCLUDE EASTL/packages/EABase/include/Common/EABase)
-target_compile_features(EASTL PUBLIC cxx_std_20)
+target_compile_features(EASTL-interface INTERFACE cxx_std_20)
 # silence deprecation warnings from EASTL for now (we will fix them when the upstream does)
-target_compile_definitions(EASTL PUBLIC EASTL_DEPRECATIONS_FOR_2024_APRIL=EA_DISABLED)
+target_compile_definitions(EASTL-interface INTERFACE EASTL_DEPRECATIONS_FOR_2024_APRIL=EA_DISABLED)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND
         CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0)
-    target_compile_options(EASTL PUBLIC -Wno-deprecated-builtins)
+    target_compile_options(EASTL-interface INTERFACE -Wno-deprecated-builtins)
 endif ()
 
 add_library(half INTERFACE)
@@ -192,9 +154,23 @@ install(DIRECTORY reproc/reproc++/include/reproc++
 # Note: we do not link `reproc` and `reproc++` to `luisa-compute-ext` but
 #       instead to `luisa-compute-core` since this is an OBJECT library.
 
+# yyjson
+add_library(luisa-compute-ext-yyjson-interface INTERFACE)
+target_include_directories(luisa-compute-ext-yyjson-interface INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/yyjson/src>)
+target_compile_definitions(luisa-compute-ext-yyjson-interface INTERFACE YYJSON_IMPORTS=1)
+add_library(luisa-compute-ext-yyjson OBJECT yyjson/src/yyjson.c yyjson/src/yyjson.h)
+target_link_libraries(luisa-compute-ext-yyjson PUBLIC luisa-compute-ext-yyjson-interface)
+target_compile_definitions(luisa-compute-ext-yyjson PRIVATE YYJSON_EXPORTS=1)
+if (UNIX AND NOT APPLE)
+    set_target_properties(luisa-compute-ext-yyjson PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif ()
+
+# marl
 add_library(luisa-compute-ext-marl-interface INTERFACE)
 target_include_directories(luisa-compute-ext-marl-interface INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/marl/include>)
+target_link_libraries(luisa-compute-ext-marl-interface INTERFACE EASTL-interface)
 target_compile_definitions(luisa-compute-ext-marl-interface INTERFACE MARL_DLL=1)
 target_link_libraries(luisa-compute-ext INTERFACE luisa-compute-ext-marl-interface)
 luisa_compute_install_extension(luisa-compute-ext-marl-interface INCLUDE marl/include/marl)
@@ -207,7 +183,7 @@ file(GLOB LUISA_COMPUTE_MARL_CXX_SOURCES CONFIGURE_DEPENDS marl/src/*.cpp)
 list(FILTER LUISA_COMPUTE_MARL_CXX_SOURCES EXCLUDE REGEX ".*build.marl.cpp$")
 add_library(luisa-compute-ext-marl OBJECT ${LUISA_COMPUTE_MARL_HEADERS} ${LUISA_COMPUTE_MARL_CXX_SOURCES})
 target_compile_definitions(luisa-compute-ext-marl PRIVATE MARL_BUILDING_DLL=1)
-target_link_libraries(luisa-compute-ext-marl PRIVATE EASTL luisa-compute-ext-marl-interface)
+target_link_libraries(luisa-compute-ext-marl PRIVATE EASTL-interface luisa-compute-ext-marl-interface)
 set_target_properties(luisa-compute-ext-marl PROPERTIES UNITY_BUILD ${LUISA_COMPUTE_ENABLE_UNITY_BUILD})
 if (NOT WIN32)
     enable_language(ASM)

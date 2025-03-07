@@ -146,11 +146,10 @@ void MetalAccel::_do_update(MetalCommandEncoder &encoder) noexcept {
     LUISA_ASSERT(_handle != nullptr, "Acceleration structure is not built.");
     LUISA_ASSERT(_descriptor != nullptr, "Descriptor is not allocated.");
     LUISA_ASSERT(_instance_buffer != nullptr, "Instance buffer is not allocated.");
-    LUISA_ASSERT(_update_buffer != nullptr, "Update buffer is not allocated.");
     auto command_encoder = encoder.command_buffer()->accelerationStructureCommandEncoder();
     _descriptor->retain();
     _handle->retain();
-    _update_buffer->retain();
+    if (_update_buffer != nullptr) { _update_buffer->retain(); }
     command_encoder->refitAccelerationStructure(_handle, _descriptor, _handle, _update_buffer, 0u);
     command_encoder->endEncoding();
     encoder.add_callback(FunctionCallbackContext::create([descriptor = _descriptor,
@@ -158,7 +157,7 @@ void MetalAccel::_do_update(MetalCommandEncoder &encoder) noexcept {
                                                           update_buffer = _update_buffer] {
         descriptor->release();
         handle->release();
-        update_buffer->release();
+        if (update_buffer != nullptr) { update_buffer->release(); }
     }));
 }
 
@@ -171,9 +170,11 @@ void MetalAccel::_do_build(MetalCommandEncoder &encoder) noexcept {
         if (_update_buffer == nullptr ||
             _update_buffer->length() < sizes.refitScratchBufferSize) {
             if (_update_buffer != nullptr) { _update_buffer->release(); }
-            _update_buffer = device->newBuffer(sizes.refitScratchBufferSize,
-                                               MTL::ResourceStorageModePrivate |
-                                                   MTL::ResourceHazardTrackingModeTracked);
+            if (sizes.refitScratchBufferSize != 0) {
+                _update_buffer = device->newBuffer(sizes.refitScratchBufferSize,
+                                                   MTL::ResourceStorageModePrivate |
+                                                       MTL::ResourceHazardTrackingModeTracked);
+            }
         }
     }
     if (_handle != nullptr) { _handle->release(); }
@@ -269,4 +270,3 @@ void MetalAccel::mark_resource_usages(MetalCommandEncoder &encoder,
 }
 
 }// namespace luisa::compute::metal
-

@@ -34,7 +34,7 @@ void DynamicModule::dispose() noexcept {
 }
 
 [[nodiscard]] static auto &dynamic_module_search_paths() noexcept {
-    static luisa::vector<std::pair<std::filesystem::path, size_t>> paths;
+    static luisa::vector<std::pair<luisa::filesystem::path, std::size_t>> paths;
     return paths;
 }
 
@@ -45,21 +45,27 @@ void DynamicModule::dispose() noexcept {
 }
 #endif
 
-void DynamicModule::add_search_path(const std::filesystem::path &path) noexcept {
-    std::lock_guard lock{dynamic_module_search_path_mutex()};
-    auto canonical_path = std::filesystem::canonical(path);
+void DynamicModule::add_search_path(const luisa::filesystem::path &path) noexcept {
+    std::lock_guard lock { dynamic_module_search_path_mutex() };
+    auto canonical_path = luisa::filesystem::canonical(path);
     auto &&paths = dynamic_module_search_paths();
-    if (auto iter = std::find_if(paths.begin(), paths.end(), [&canonical_path](auto &&p) noexcept {
-            return p.first == canonical_path;
-        });
-        iter != paths.end()) {
+    if (
+        auto iter = std::find_if(
+            paths.begin(),
+            paths.end(),
+            [&canonical_path](auto &&p) noexcept {
+                return p.first == canonical_path;
+            }
+        );
+        iter != paths.end()
+    ) {
         iter->second++;
     } else {
 #ifdef LUISA_PLATFORM_WINDOWS
         auto &&cookies = dynamic_module_search_path_cookies();
         cookies.emplace_back(AddDllDirectory(canonical_path.c_str()));
 #endif
-        paths.emplace_back(std::move(canonical_path), 0u);
+        paths.emplace_back(std::move(canonical_path), 0);
     }
 }
 
@@ -106,17 +112,21 @@ DynamicModule DynamicModule::load(std::string_view name) noexcept {
     return DynamicModule{nullptr};
 }
 
-DynamicModule DynamicModule::load(const std::filesystem::path &folder, std::string_view name) noexcept {
+DynamicModule DynamicModule::load(
+    const luisa::filesystem::path &folder,
+    luisa::string_view name
+) noexcept {
     Clock clock;
     auto p = folder / dynamic_module_name(name);
     if (auto handle = dynamic_module_load(p)) {
         LUISA_INFO(
             "Loaded dynamic module '{}' in {} ms.",
-            to_string(p), clock.toc());
-        return DynamicModule{handle};
+            to_string(p), clock.toc()
+        );
+        return DynamicModule { handle };
     }
-    return DynamicModule{nullptr};
+
+    return DynamicModule { nullptr };
 }
 
-}// namespace luisa
-
+} // namespace luisa end

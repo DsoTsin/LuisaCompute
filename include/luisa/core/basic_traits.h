@@ -31,10 +31,6 @@ template<typename T>
 using half = half_float::half;
 using namespace half_float::literal;
 
-using byte = int8_t;
-using ubyte = uint8_t;
-
-
 static_assert(sizeof(half) == 2u && alignof(half) == 2u,
               "half should be 16-bit sized and aligned.");
 
@@ -47,7 +43,11 @@ static_assert(std::is_same_v<decltype(sin(1._h)), half>,
 static_assert(std::is_arithmetic_v<half>,
               "half should be arithmetic.");
 
-using uchar = uint8_t;
+using byte = int8_t;
+using ubyte = uint8_t;
+
+using uchar = unsigned char;
+
 using ushort = uint16_t;
 using uint = uint32_t;
 
@@ -67,6 +67,8 @@ using is_integral = std::disjunction<
     std::is_same<std::remove_cvref_t<T>, unsigned long long>,
     std::is_same<std::remove_cvref_t<T>, short>,
     std::is_same<std::remove_cvref_t<T>, ushort>,
+    std::is_same<std::remove_cvref_t<T>, char>,
+    std::is_same<std::remove_cvref_t<T>, uchar>,
     std::is_same<std::remove_cvref_t<T>, byte>,
     std::is_same<std::remove_cvref_t<T>, ubyte>>;
 
@@ -91,6 +93,8 @@ constexpr auto is_floating_point_v = is_floating_point<T>::value;
 template<typename T>
 using is_signed = std::disjunction<
     is_floating_point<T>,
+    std::is_same<std::remove_cvref_t<T>, char>,
+    std::is_same<std::remove_cvref_t<T>, byte>,
     std::is_same<std::remove_cvref_t<T>, short>,
     std::is_same<std::remove_cvref_t<T>, int>,
     std::is_same<std::remove_cvref_t<T>, slong>>;
@@ -100,6 +104,8 @@ constexpr auto is_signed_v = is_signed<T>::value;
 
 template<typename T>
 using is_unsigned = std::disjunction<
+    std::is_same<std::remove_cvref_t<T>, uchar>,
+    std::is_same<std::remove_cvref_t<T>, ubyte>,
     std::is_same<std::remove_cvref_t<T>, ushort>,
     std::is_same<std::remove_cvref_t<T>, uint>,
     std::is_same<std::remove_cvref_t<T>, ulong>>;

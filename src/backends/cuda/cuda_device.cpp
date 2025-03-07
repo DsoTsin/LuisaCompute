@@ -25,6 +25,7 @@
 #include "cuda_mesh.h"
 #include "cuda_curve.h"
 #include "cuda_procedural_primitive.h"
+#include "cuda_motion_instance.h"
 #include "cuda_accel.h"
 #include "cuda_stream.h"
 #include "cuda_event.h"
@@ -144,7 +145,7 @@ CUDADevice::CUDADevice(Context &&ctx,
             const char *error_string = nullptr;
             cuGetErrorString(error, &error_string);
             LUISA_WARNING_WITH_LOCATION(
-                "Failed to load built-in kernels: {}. "
+                "Failed to load built-in kernels: {} "
                 "Re-trying with patched PTX version...",
                 error_string ? error_string : "Unknown error");
             CUDAShader::_patch_ptx_version(builtin_kernel_ptx);
@@ -195,6 +196,42 @@ CUDADevice::CUDADevice(Context &&ctx,
     } else {
         _cudadevrt_library = luisa::string{std::istreambuf_iterator<char>{devrt_file},
                                            std::istreambuf_iterator<char>{}};
+    }
+    // test if the device runtime library is recognized by the driver
+    if (!_cudadevrt_library.empty()) {
+        // TODO: this check can consume hundreds of milliseconds! Is there a better way?
+        // generate some non-sense kernel source with dynamic parallelism
+        auto dummy_kernel_src = R"(__global__ void a() {} __global__ void b() { a<<<1024,32>>>(); })";
+        auto dummy_ptx = _compiler->compile(dummy_kernel_src, "dummy_devrt_check.cu", options);
+        void *output_cubin = nullptr;
+        size_t output_cubin_size = 0u;
+        with_handle([&] {
+            CUlinkState link_state{};
+            LUISA_CHECK_CUDA(cuLinkCreate(0u, nullptr, nullptr, &link_state));
+            auto report_failure_and_clear_library = [&](auto phase) {
+                LUISA_WARNING_WITH_LOCATION(
+                    "Found CUDA device runtime library '{}', but the driver does not "
+                    "recognize it when {}. Indirect kernel dispatch will not be available.",
+                    device_runtime_lib_path.string(), phase);
+                _cudadevrt_library.clear();
+            };
+            if (cuLinkAddData(link_state, CU_JIT_INPUT_PTX,
+                              dummy_ptx.data(), dummy_ptx.size(),
+                              "dummy_kernel", 0u, nullptr, nullptr) != CUDA_SUCCESS) {
+                report_failure_and_clear_library("adding the kernel PTX");
+            } else if (cuLinkAddData(link_state, CU_JIT_INPUT_LIBRARY,
+                                     _cudadevrt_library.data(), _cudadevrt_library.size(),
+                                     "cudadevrt", 0u, nullptr, nullptr) != CUDA_SUCCESS) {
+                report_failure_and_clear_library("adding the device runtime library");
+            } else if (cuLinkComplete(link_state, &output_cubin, &output_cubin_size) != CUDA_SUCCESS) {
+                report_failure_and_clear_library("completing linking");
+            }
+            LUISA_CHECK_CUDA(cuLinkDestroy(link_state));
+        });
+    }
+    if (!_cudadevrt_library.empty()) {
+        LUISA_VERBOSE("Successfully loaded CUDA device runtime library. "
+                      "Indirect dispatch feature is available.");
     }
 }
 
@@ -487,6 +524,7 @@ template<bool allow_update_expected_metadata>
         expected_metadata.requires_trace_any = metadata->requires_trace_any;
         expected_metadata.requires_ray_query = metadata->requires_ray_query;
         expected_metadata.requires_printing = metadata->requires_printing;
+        expected_metadata.requires_motion_blur = metadata->requires_motion_blur;
         if (expected_metadata.max_register_count == 0u) { expected_metadata.max_register_count = metadata->max_register_count; }
         if (all(expected_metadata.block_size == 0u)) { expected_metadata.block_size = metadata->block_size; }
         if (expected_metadata.argument_types.empty()) { expected_metadata.argument_types = metadata->argument_types; }
@@ -507,11 +545,11 @@ template<bool allow_update_expected_metadata>
     return ptx_data;
 }
 
-ShaderCreationInfo CUDADevice::_create_shader(luisa::string name,
-                                              const string &source, const ShaderOption &option,
-                                              luisa::span<const char *const> nvrtc_options,
-                                              const CUDAShaderMetadata &expected_metadata,
-                                              luisa::vector<ShaderDispatchCommand::Argument> bound_arguments) noexcept {
+ShaderCreationInfo CUDADevice::_load_or_compile_shader(luisa::string name,
+                                                       const string &source, const ShaderOption &option,
+                                                       luisa::span<const char *const> nvrtc_options,
+                                                       const CUDAShaderMetadata &expected_metadata,
+                                                       luisa::vector<ShaderDispatchCommand::Argument> bound_arguments) noexcept {
 
     // generate a default name if not specified
     auto uses_user_path = !name.empty();
@@ -645,21 +683,28 @@ ShaderCreationInfo CUDADevice::create_shader(const ShaderOption &option, Functio
     auto sm_option = luisa::format("-arch=compute_{}", _handle.compute_capability());
     auto nvrtc_version_option = luisa::format("-DLC_NVRTC_VERSION={}", _compiler->nvrtc_version());
     auto optix_version_option = luisa::format("-DLC_OPTIX_VERSION={}", optix::VERSION);
-    luisa::vector<const char *> nvrtc_options {
+    luisa::vector<const char *> nvrtc_options{
         sm_option.c_str(),
-            nvrtc_version_option.c_str(),
-            optix_version_option.c_str(),
-            "--std=c++17",
-            "-default-device",
-            "-restrict",
-            "-extra-device-vectorization",
-            "-dw",
-            "-w",
-            "-ewp",
+        nvrtc_version_option.c_str(),
+        optix_version_option.c_str(),
+        "--std=c++17",
+        "-default-device",
+        "-restrict",
+        "-extra-device-vectorization",
+        "-dw",
+        "-w",
+        "-ewp",
 #if !defined(NDEBUG) && LUISA_CUDA_KERNEL_DEBUG
-            "-DLUISA_DEBUG=1",
+        "-DLUISA_DEBUG=1",
 #endif
     };
+
+    // We can safely turn on the minimal mode if using optix
+    if (_compiler->nvrtc_version() >= 120400 &&
+        _handle.driver_version() >= 12040 &&
+        kernel.requires_raytracing()) {
+        nvrtc_options.emplace_back("-minimal");
+    }
 
     luisa::string max_reg_opt;
     if (option.max_registers != 0u) {
@@ -678,10 +723,10 @@ ShaderCreationInfo CUDADevice::create_shader(const ShaderOption &option, Functio
 
     // multithreaded compilation
     // TODO: the flag seems not working any more
-    // if (_compiler->nvrtc_version() >= 120100 &&
-    //     _handle.driver_version() >= 12030) {
-    //     nvrtc_options.emplace_back("-split-compile=0");
-    // }
+    if (_compiler->nvrtc_version() >= 120100 &&
+        _handle.driver_version() >= 12030) {
+        nvrtc_options.emplace_back("-split-compile=0");
+    }
 
     if (option.enable_debug_info) {
         nvrtc_options.emplace_back("-lineinfo");
@@ -712,10 +757,13 @@ ShaderCreationInfo CUDADevice::create_shader(const ShaderOption &option, Functio
                     CUDAShaderMetadata::Kind::RAY_TRACING :
                     CUDAShaderMetadata::Kind::COMPUTE,
         .enable_debug = option.enable_debug_info,
-        .requires_trace_closest = kernel.propagated_builtin_callables().test(CallOp::RAY_TRACING_TRACE_CLOSEST),
-        .requires_trace_any = kernel.propagated_builtin_callables().test(CallOp::RAY_TRACING_TRACE_ANY),
+        .requires_trace_closest = kernel.propagated_builtin_callables().test(CallOp::RAY_TRACING_TRACE_CLOSEST) ||
+                                  kernel.propagated_builtin_callables().test(CallOp::RAY_TRACING_TRACE_CLOSEST_MOTION_BLUR),
+        .requires_trace_any = kernel.propagated_builtin_callables().test(CallOp::RAY_TRACING_TRACE_ANY) ||
+                              kernel.propagated_builtin_callables().test(CallOp::RAY_TRACING_TRACE_ANY_MOTION_BLUR),
         .requires_ray_query = kernel.propagated_builtin_callables().uses_ray_query(),
         .requires_printing = kernel.requires_printing(),
+        .requires_motion_blur = kernel.requires_motion_blur(),
         .max_register_count = std::clamp(option.max_registers, 0u, 255u),
         .block_size = kernel.block_size(),
         .argument_types = [kernel] {
@@ -738,9 +786,9 @@ ShaderCreationInfo CUDADevice::create_shader(const ShaderOption &option, Functio
             }
             return t; }(),
     };
-    return _create_shader(option.name, scratch.string(),
-                          option, nvrtc_options,
-                          metadata, std::move(bound_arguments));
+    return _load_or_compile_shader(option.name, scratch.string(),
+                                   option, nvrtc_options,
+                                   metadata, std::move(bound_arguments));
 }
 
 ShaderCreationInfo CUDADevice::create_shader(const ShaderOption &option, const ir::KernelModule *kernel) noexcept {
@@ -907,6 +955,21 @@ void CUDADevice::destroy_procedural_primitive(uint64_t handle) noexcept {
     with_handle([=] {
         auto primitive = reinterpret_cast<CUDAProceduralPrimitive *>(handle);
         delete_with_allocator(primitive);
+    });
+}
+
+ResourceCreationInfo CUDADevice::create_motion_instance(const AccelMotionOption &option) noexcept {
+    auto instance_handle = with_handle([this, &option] {
+        return new_with_allocator<CUDAMotionInstance>(this, option);
+    });
+    return {.handle = reinterpret_cast<uint64_t>(instance_handle),
+            .native_handle = const_cast<optix::TraversableHandle *>(instance_handle->pointer_to_handle())};
+}
+
+void CUDADevice::destroy_motion_instance(uint64_t handle) noexcept {
+    with_handle([=] {
+        auto instance = reinterpret_cast<CUDAMotionInstance *>(handle);
+        delete_with_allocator(instance);
     });
 }
 
@@ -1100,8 +1163,9 @@ void CUDADevice::set_name(luisa::compute::Resource::Tag resource_tag,
                 break;
             case Resource::Tag::MESH: [[fallthrough]];
             case Resource::Tag::CURVE: [[fallthrough]];
-            case Resource::Tag::PROCEDURAL_PRIMITIVE:
-                reinterpret_cast<CUDAPrimitive *>(handle)->set_name(std::move(name));
+            case Resource::Tag::PROCEDURAL_PRIMITIVE: [[fallthrough]];
+            case Resource::Tag::MOTION_INSTANCE:
+                reinterpret_cast<CUDAPrimitiveBase *>(handle)->set_name(std::move(name));
                 break;
             case Resource::Tag::ACCEL:
                 reinterpret_cast<CUDAAccel *>(handle)->set_name(std::move(name));

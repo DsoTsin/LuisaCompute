@@ -1,6 +1,6 @@
 #pragma once
 
-#include <luisa/dsl/expr.h>
+#include <luisa/dsl/var.h>
 #include <luisa/dsl/operators.h>
 
 namespace luisa::compute {
@@ -79,11 +79,11 @@ public:
     // for autodiff; see definitions in dsl/builtin.h
     void requires_grad() const noexcept;
     void backward() const noexcept;
-    void backward(const Local<T> grad) const noexcept;
+    void backward(const Local<T> &grad) const noexcept;
     [[nodiscard]] Local<T> grad() const noexcept;
     Local<T> detach() const noexcept;
 
-    [[nodiscard]] Var<uint64_t> address() const noexcept {
+    [[nodiscard]] auto address() const noexcept {
         return def<uint64_t>(detail::FunctionBuilder::current()->call(
             Type::of<uint64_t>(), CallOp::ADDRESS_OF, {_expression}));
     }

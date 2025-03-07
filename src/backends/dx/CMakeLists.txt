@@ -1,6 +1,7 @@
 # TODO
 if (WIN32)
     message(STATUS "Build with DirectX backend")
+
     file(GLOB_RECURSE LC_BACKEND_DX_SOURCES CONFIGURE_DEPENDS "*.cpp" "../common/hlsl/*.cpp")
 
     # download support SDK files
@@ -20,8 +21,8 @@ if (WIN32)
         message(STATUS "DirectX SDK directory: ${LUISA_COMPUTE_DX_SDK_DIR}")
     endif ()
     if (NOT LUISA_COMPUTE_DX_SDK_DIR OR NOT EXISTS "${LUISA_COMPUTE_DX_SDK_DIR}")
-        set(LUISA_COMPUTE_DX_SDK_DOWNLOAD_URL "https://github.com/LuisaGroup/SDKs/releases/download/sdk/dx_sdk.zip")
-        set(LUISA_COMPUTE_DX_SDK_SHA1 "4ce202d1141feaf32d83e8222fa6b4b902408c06")
+        set(LUISA_COMPUTE_DX_SDK_DOWNLOAD_URL "https://github.com/LuisaGroup/SDKs/releases/download/sdk/dx_sdk_20240920.zip")
+        set(LUISA_COMPUTE_DX_SDK_SHA1 "4c8390d674f375e6676ba15ce452db59df88da8f")
         message(STATUS "Downloading DirectX SDK from ${LUISA_COMPUTE_DX_SDK_DOWNLOAD_URL}")
         include(FetchContent)
         FetchContent_Declare(luisa_compute_dx_sdk
@@ -52,9 +53,9 @@ if (WIN32)
             SUPPORT_DIR ${LUISA_COMPUTE_DX_SDK_DIR})
     target_precompile_headers(luisa-compute-backend-dx PRIVATE pch.h)
     target_include_directories(luisa-compute-backend-dx PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(luisa-compute-backend-dx PRIVATE D3D12 d3dcompiler dxgi luisa-compute-vstl DirectML)
+    target_link_libraries(luisa-compute-backend-dx PRIVATE D3D12 d3dcompiler dxgi DirectML)
     target_compile_definitions(luisa-compute-backend-dx PRIVATE UNICODE)
-    if (CMAKE_CXX_COMPILER_ID MATCHES " Clang")
+    if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
         target_compile_definitions(luisa-compute-backend-dx PRIVATE
                 _XM_NO_INTRINSICS_
                 m128_f32=vector4_f32
@@ -69,6 +70,19 @@ if (WIN32)
 
     if (TARGET luisa-compute-oidn-ext)
         target_link_libraries(luisa-compute-backend-dx PRIVATE luisa-compute-oidn-ext)
+    endif ()
+
+    set(ZLIB_USE_STATIC_LIBS ON)
+    find_package(ZLIB)
+    if (ZLIB_FOUND)
+        message(STATUS "Found ZLIB: ${ZLIB_LIBRARIES}")
+        target_link_libraries(luisa-compute-backend-dx PRIVATE ZLIB::ZLIB)
+    else () # use maxwell's favorite xrepo otherwise
+        target_include_directories(luisa-compute-backend-dx PRIVATE "../../../xrepo/packages/z/zlib/port/zlib/include")
+        # convert zlib path to absolute path
+        set(ZLIB_LIB_FILE "../../../xrepo/packages/z/zlib/port/zlib/lib/windows/x64/zlibstatic.lib")
+        cmake_path(ABSOLUTE_PATH ZLIB_LIB_FILE)
+        target_link_libraries(luisa-compute-backend-dx PRIVATE ${ZLIB_LIB_FILE})
     endif ()
 
 elseif (NOT LUISA_COMPUTE_CHECK_BACKEND_DEPENDENCIES)

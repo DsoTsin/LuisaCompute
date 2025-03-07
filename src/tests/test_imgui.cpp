@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     // We support multiple ImGui contexts, so if you would like to tweak ImGui settings for
     // a specific window, you can use window.with_context to get a context guard.
     window.with_context([&] {
-        ImGui::StyleColorsClassic();
+        ImGui::StyleColorsDark();
         auto &style = ImGui::GetStyle();
         style.TabRounding = 0.f;
     });
@@ -90,8 +90,7 @@ int main(int argc, char *argv[]) {
                 // You can register an image to ImGuiWindow, and get an id for it to use in ImGui::Image
                 // Note: it's safe to register the same image multiple times, the same id will be returned
                 auto demo_image_id = window.register_texture(demo_image, Sampler::linear_linear_zero());
-                ImGui::Image(reinterpret_cast<ImTextureID>(demo_image_id), ImVec2{size, size},
-                             {}, ImVec2(1.f / scale, 1.f / scale));
+                ImGui::Image(demo_image_id, ImVec2{size, size}, {}, ImVec2(1.f / scale, 1.f / scale));
             }
             ImGui::End();
 

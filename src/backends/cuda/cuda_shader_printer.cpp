@@ -64,9 +64,14 @@ CUDAShaderPrinter::Binding CUDAShaderPrinter::encode(CUDACommandEncoder &encoder
         print_buffer_capacity,
         [&b, &encoder, this](CUDAHostBufferPool::View *temp) noexcept {
             if (temp == nullptr) {
-                LUISA_WARNING_WITH_LOCATION(
-                    "Failed to allocate temporary buffer for shader "
-                    "printer. Printing is disabled this time.");
+                static thread_local bool warned = false;
+                if (!warned) {
+                    LUISA_WARNING_WITH_LOCATION(
+                        "Failed to allocate temporary buffer for shader "
+                        "printer. Printing is disabled this time. Consecutive "
+                        "warnings would be suppressed to avoid flooding.");
+                    warned = true;
+                }
                 return;
             }
             *reinterpret_cast<size_t *>(temp->address()) = 0ul;

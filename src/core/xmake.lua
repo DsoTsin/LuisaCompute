@@ -15,7 +15,7 @@ on_load(function(target)
         if is_mode("debug") then
             target:add("syslinks", "Dbghelp")
         end
-        target:add("defines", "NOMINMAX", "LUISA_PLATFORM_WINDOWS", {
+        target:add("defines", "NOMINMAX", "LUISA_PLATFORM_WINDOWS", "_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR", {
             public = true
         })
     elseif is_plat("linux") then
@@ -39,7 +39,9 @@ on_load(function(target)
     target:add("deps", "eastl", "spdlog", "lc-check-winsdk")
     local marl_path = path.join(os.scriptdir(), "../ext/marl")
     if (not get_config("external_marl")) and (os.exists(marl_path)) then
-        target:add("defines", "MARL_DLL", {public = true})
+        target:add("defines", "MARL_DLL", {
+            public = true
+        })
         target:add("defines", "MARL_BUILDING_DLL")
         target:add("files", path.join(marl_path, "src/*.c"), path.join(marl_path, "src/build.marl.cpp"))
         if not is_plat("windows") then

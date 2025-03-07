@@ -59,7 +59,7 @@ decltype(auto) with_cuda(CUcontext ctx, F &&f) {
 
 WindowsSecurityAttributes::WindowsSecurityAttributes() {
     m_winPSecurityDescriptor = (PSECURITY_DESCRIPTOR)calloc(1, SECURITY_DESCRIPTOR_MIN_LENGTH + 2 * sizeof(void **));
-    assert(m_winPSecurityDescriptor != (PSECURITY_DESCRIPTOR)NULL);
+    LUISA_ASSUME(m_winPSecurityDescriptor != (PSECURITY_DESCRIPTOR)NULL);
 
     PSID *ppSID = (PSID *)((PBYTE)m_winPSecurityDescriptor + SECURITY_DESCRIPTOR_MIN_LENGTH);
     PACL *ppACL = (PACL *)((PBYTE)ppSID + sizeof(PSID *));
@@ -295,8 +295,8 @@ static void initialize_cuda() noexcept {
         char cudaLuid[sizeof(d3d12Luid.LowPart) + sizeof(d3d12Luid.HighPart)] = {};
         unsigned int cudaNodeMask = 0;
         LUISA_CHECK_CUDA(cuDeviceGetLuid(cudaLuid, &cudaNodeMask, i));
-        if (!memcmp(&d3d12Luid.LowPart, cudaLuid, sizeof(d3d12Luid.LowPart)) &&
-            !memcmp(&d3d12Luid.HighPart, cudaLuid + sizeof(d3d12Luid.LowPart), sizeof(d3d12Luid.HighPart))) {
+        if (!std::memcmp(&d3d12Luid.LowPart, cudaLuid, sizeof(d3d12Luid.LowPart)) &&
+            !std::memcmp(&d3d12Luid.HighPart, cudaLuid + sizeof(d3d12Luid.LowPart), sizeof(d3d12Luid.HighPart))) {
             LUISA_VERBOSE_WITH_LOCATION("Found cuda device at {} for d3d12 device.", i);
             return i;
         }

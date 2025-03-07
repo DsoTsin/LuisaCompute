@@ -7,6 +7,8 @@
 #include "depth_buffer.h"
 #include "bindless_array.h"
 #include "mesh.h"
+#include "curve.h"
+#include "motion_instance.h"
 #include "procedural_primitives.h"
 #include "shader.h"
 #include "swap_chain.h"
@@ -72,13 +74,30 @@ void Stream::check_compete() {
                         detail::usage_name(iter.second.usage),
                         get_name());
                 } else {
-                    LUISA_WARNING(
-                        "Simultaneous-accessible resource {} is used to be {} by {} and {} by {} simultaneously.",
-                        res->get_name(),
-                        detail::usage_name(stream_iter.second.usage),
-                        other_stream->get_name(),
-                        detail::usage_name(iter.second.usage),
-                        get_name());
+                    switch (res->tag()) {
+                        case Resource::Tag::BUFFER:
+                        case Resource::Tag::TEXTURE:
+                        case Resource::Tag::BINDLESS_ARRAY:
+                        case Resource::Tag::MESH:
+                        case Resource::Tag::CURVE:
+                        case Resource::Tag::PROCEDURAL_PRIMITIVE:
+                        case Resource::Tag::MOTION_INSTANCE:
+                        case Resource::Tag::ACCEL:
+                        case Resource::Tag::SWAP_CHAIN:
+                        case Resource::Tag::DEPTH_BUFFER:
+                        case Resource::Tag::SPARSE_BUFFER:
+                        case Resource::Tag::SPARSE_TEXTURE:
+                        case Resource::Tag::SPARSE_BUFFER_HEAP:
+                        case Resource::Tag::SPARSE_TEXTURE_HEAP:
+                            LUISA_WARNING(
+                                "Simultaneous-accessible resource {} is used to be {} by {} and {} by {} simultaneously.",
+                                res->get_name(),
+                                detail::usage_name(stream_iter.second.usage),
+                                other_stream->get_name(),
+                                detail::usage_name(iter.second.usage),
+                                get_name());
+                            break;
+                    }
                 }
             }
         }
@@ -377,7 +396,23 @@ void Stream::dispatch(DeviceInterface *dev, CommandList &cmd_list) {
                 }
                 custom(dev, cmd);
             } break;
-            case Command::Tag::ECurveBuildCommand: LUISA_NOT_IMPLEMENTED();
+            case Command::Tag::ECurveBuildCommand: {
+                Device::check_stream(handle(), StreamFunc::Compute);
+                auto c = static_cast<CurveBuildCommand *>(cmd);
+                auto curve = RWResource::get<Curve>(c->handle());
+                curve->cp = RWResource::get<Buffer>(c->cp_buffer());
+                curve->seg = RWResource::get<Buffer>(c->seg_buffer());
+                curve->cp_range = Range{c->cp_buffer_offset(), c->cp_count() * c->cp_stride()};
+                curve->seg_range = Range{c->seg_buffer_offset(), c->seg_count()};
+                mark_handle(c->handle(), Usage::WRITE, Range{});
+            } break;
+            case CmdTag::EMotionInstanceBuildCommand: {
+                Device::check_stream(handle(), StreamFunc::Compute);
+                auto c = static_cast<MotionInstanceBuildCommand *>(cmd);
+                auto motion = RWResource::get<MotionInstance>(c->handle());
+                motion->child = RWResource::get<RWResource>(c->child());
+                mark_handle(c->handle(), Usage::WRITE, Range{});
+            } break;
         }
         // TODO: resources record
     }

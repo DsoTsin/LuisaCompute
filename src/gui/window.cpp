@@ -35,7 +35,8 @@ struct WindowImpl : public Window::IWindowImpl {
     uint64_t window_handle{};
 
     WindowImpl(uint2 size, char const *name, bool resizable, bool full_screen) noexcept {
-        glfwInit();
+        static std::once_flag once_flag;
+        std::call_once(once_flag, [] { glfwInit(); });
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
         glfwWindowHint(GLFW_RESIZABLE, resizable);
         window = glfwCreateWindow(size.x, size.y, name, full_screen ? glfwGetPrimaryMonitor() : nullptr, nullptr);
@@ -103,7 +104,7 @@ struct WindowImpl : public Window::IWindowImpl {
     }
     ~WindowImpl() noexcept override {
         glfwDestroyWindow(window);
-        glfwTerminate();
+        // glfwTerminate();
     }
     [[nodiscard]] uint64_t native_display() const noexcept {
 #if defined(LUISA_PLATFORM_WINDOWS) || defined(LUISA_PLATFORM_APPLE)

@@ -188,6 +188,7 @@ constexpr auto pixel_format_count = to_underlying(PixelFormat::BC7UNorm) + 1u;
     }
     return PixelStorage{};
 }
+
 [[nodiscard]] constexpr size_t pixel_storage_align(PixelStorage storage) noexcept {
     if (is_block_compressed(storage)) {
         switch (storage) {
@@ -225,6 +226,7 @@ constexpr auto pixel_format_count = to_underlying(PixelFormat::BC7UNorm) + 1u;
     }
     detail::error_pixel_invalid_format("unknown");
 }
+
 [[nodiscard]] constexpr size_t pixel_storage_size(PixelStorage storage, uint3 size) noexcept {
     if (is_block_compressed(storage)) {
         auto block_width = (size.x + 3u) / 4u;

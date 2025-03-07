@@ -21,8 +21,8 @@ TopAccel::TopAccel(Device *device, AccelOption const &option)
         }
         LUISA_ERROR_WITH_LOCATION("Unreachable.");
     };
-    memset(&topLevelBuildDesc, 0, sizeof(D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC));
-    memset(&topLevelPrebuildInfo, 0, sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO));
+    std::memset(&topLevelBuildDesc, 0, sizeof(D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC));
+    std::memset(&topLevelPrebuildInfo, 0, sizeof(D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO));
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS &topLevelInputs = topLevelBuildDesc.Inputs;
     topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     topLevelInputs.Flags = GetPreset();
@@ -59,6 +59,7 @@ TopAccel::~TopAccel() {
     }
 }
 bool TopAccel::GenerateNewBuffer(
+    char const *name,
     ResourceStateTracker &tracker,
     CommandBufferBuilder &builder,
     vstd::unique_ptr<DefaultBuffer> &oldBuffer, size_t newSize, bool needCopy, D3D12_RESOURCE_STATES state) {
@@ -68,7 +69,9 @@ bool TopAccel::GenerateNewBuffer(
             device,
             newSize,
             device->defaultAllocator.get(),
-            state));
+            state,
+            false,
+            name));
         return true;
     } else {
         if (newSize <= oldBuffer->GetByteSize()) return false;
@@ -121,6 +124,7 @@ void TopAccel::PreProcessInst(
     ProcessSetMap();
     size_t instanceByteCount = size * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
     if (GenerateNewBuffer(
+            "tlas-instance-buffer",
             tracker, builder, instBuffer, instanceByteCount, true, tracker.ReadState(ResourceReadUsage::AccelBuildSrc))) {
         input.InstanceDescs = instBuffer->GetAddress();
     }
@@ -131,7 +135,7 @@ void TopAccel::ProcessSetMap() {
         setDesc.reserve(setDesc.size() + setMap.size());
         for (auto &&i : setMap) {
             auto &mod = setDesc.emplace_back();
-            memset(&mod, 0, sizeof(PackedModifier));
+            std::memset(&mod, 0, sizeof(PackedModifier));
             mod.index = i.first;
             mod.flags = AccelBuildCommand::Modification::flag_primitive;
             mod.primitive = i.second->mesh->GetAccelBuffer()->GetAddress();
@@ -180,7 +184,7 @@ void TopAccel::InitSetDesc(vstd::span<AccelBuildCommand::Modification const> con
     {
         auto iter = setDesc.data();
         for (auto &i : modifications) {
-            memcpy(iter->affine, i.affine, sizeof(iter->affine));
+            std::memcpy(iter->affine, i.affine, sizeof(iter->affine));
             iter->primitive = i.primitive;
             iter->index = i.index;
             iter->vis_mask = i.vis_mask;
@@ -227,11 +231,12 @@ size_t TopAccel::PreProcess(
 
     size_t instanceByteCount = size * sizeof(D3D12_RAYTRACING_INSTANCE_DESC);
     if (GenerateNewBuffer(
+            "tlas-instance-buffer",
             tracker, builder, instBuffer, instanceByteCount, true, tracker.ReadState(ResourceReadUsage::AccelBuildSrc))) {
         input.InstanceDescs = instBuffer->GetAddress();
     }
     device->device->GetRaytracingAccelerationStructurePrebuildInfo(&input, &topLevelPrebuildInfo);
-    if (GenerateNewBuffer(tracker, builder, accelBuffer, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE)) {
+    if (GenerateNewBuffer("tlas-accel-buffer", tracker, builder, accelBuffer, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, false, D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE)) {
         update = false;
         topLevelBuildDesc.DestAccelerationStructureData = accelBuffer->GetAddress();
     }

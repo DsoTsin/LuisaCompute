@@ -170,7 +170,7 @@ enum struct CallOp : uint32_t {
     ATOMIC_FETCH_MIN,       /// [(atomic_ref, val) -> old]: stores min(old, val), returns old.
     ATOMIC_FETCH_MAX,       /// [(atomic_ref, val) -> old]: stores max(old, val), returns old.
 
-    ADDRESS_OF, // (expr) -> uint64
+    ADDRESS_OF,// (expr) -> uint64
 
     BUFFER_READ,   /// [(buffer, index) -> value]: reads the index-th element in buffer
     BUFFER_WRITE,  /// [(buffer, index, value) -> void]: writes value into the index-th element of buffer
@@ -193,6 +193,17 @@ enum struct CallOp : uint32_t {
     BINDLESS_TEXTURE3D_SAMPLE_LEVEL,     // (bindless_array, index: uint, uv: float3, level: float): float4
     BINDLESS_TEXTURE3D_SAMPLE_GRAD,      // (bindless_array, index: uint, uv: float3, ddx: float3, ddy: float3): float4
     BINDLESS_TEXTURE3D_SAMPLE_GRAD_LEVEL,// (bindless_array, index: uint, uv: float3, ddx: float3, ddy: float3,  mip_clamp: float): float4
+
+    BINDLESS_TEXTURE2D_SAMPLE_SAMPLER,           // (bindless_array, index: uint, uv: float2, filter: uint, address: uint): float4
+    BINDLESS_TEXTURE2D_SAMPLE_LEVEL_SAMPLER,     // (bindless_array, index: uint, uv: float2, level: float, filter: uint, address: uint): float4
+    BINDLESS_TEXTURE2D_SAMPLE_GRAD_SAMPLER,      // (bindless_array, index: uint, uv: float2, ddx: float2, ddy: float2, filter: uint, address: uint): float4
+    BINDLESS_TEXTURE2D_SAMPLE_GRAD_LEVEL_SAMPLER,// (bindless_array, index: uint, uv: float2, ddx: float2, ddy: float2,  mip_clamp: float, filter: uint, address: uint): float4
+    BINDLESS_TEXTURE3D_SAMPLE_SAMPLER,           // (bindless_array, index: uint, uv: float3, filter: uint, address: uint): float4
+    BINDLESS_TEXTURE3D_SAMPLE_LEVEL_SAMPLER,     // (bindless_array, index: uint, uv: float3, level: float, filter: uint, address: uint): float4
+    BINDLESS_TEXTURE3D_SAMPLE_GRAD_SAMPLER,      // (bindless_array, index: uint, uv: float3, ddx: float3, ddy: float3, filter: uint, address: uint): float4
+    BINDLESS_TEXTURE3D_SAMPLE_GRAD_LEVEL_SAMPLER,// (bindless_array, index: uint, uv: float3, ddx: float3, ddy: float3,  mip_clamp: float, filter: uint, address: uint): float4
+
+
     BINDLESS_TEXTURE2D_READ,             // (bindless_array, index: uint, coord: uint2): float4
     BINDLESS_TEXTURE3D_READ,             // (bindless_array, index: uint, coord: uint3): float4
     BINDLESS_TEXTURE2D_READ_LEVEL,       // (bindless_array, index: uint, coord: uint2, level: uint): float4
@@ -241,6 +252,12 @@ enum struct CallOp : uint32_t {
     MAKE_DOUBLE2,// (scalar, vec2)
     MAKE_DOUBLE3,// (scalar, vec3)
     MAKE_DOUBLE4,// (scalar, vec4)
+    MAKE_BYTE2,  // (scalar, vec2)
+    MAKE_BYTE3,  // (scalar, vec3)
+    MAKE_BYTE4,  // (scalar, vec4)
+    MAKE_UBYTE2, // (scalar, vec2)
+    MAKE_UBYTE3, // (scalar, vec3)
+    MAKE_UBYTE4, // (scalar, vec4)
 
     MAKE_FLOAT2X2,// (float2x2) / (float3x3) / (float4x4)
     MAKE_FLOAT3X3,// (float2x2) / (float3x3) / (float4x4)
@@ -273,15 +290,27 @@ enum struct CallOp : uint32_t {
     RAY_TRACING_INSTANCE_TRANSFORM,      // (Accel, uint)
     RAY_TRACING_INSTANCE_USER_ID,        // (Accel, uint)
     RAY_TRACING_INSTANCE_VISIBILITY_MASK,// (Accel, uint)
-    RAY_TRACING_SET_INSTANCE_TRANSFORM,  // (Accel, uint, float4x4)
-    RAY_TRACING_SET_INSTANCE_VISIBILITY, // (Accel, uint, uint)
-    RAY_TRACING_SET_INSTANCE_OPACITY,    // (Accel, uint, bool)
-    RAY_TRACING_SET_INSTANCE_USER_ID,    // (Accel, uint, uint)
+
+    RAY_TRACING_SET_INSTANCE_TRANSFORM, // (Accel, uint, float4x4)
+    RAY_TRACING_SET_INSTANCE_VISIBILITY,// (Accel, uint, uint)
+    RAY_TRACING_SET_INSTANCE_OPACITY,   // (Accel, uint, bool)
+    RAY_TRACING_SET_INSTANCE_USER_ID,   // (Accel, uint, uint)
 
     RAY_TRACING_TRACE_CLOSEST,// (Accel, ray, mask: uint): TriangleHit
     RAY_TRACING_TRACE_ANY,    // (Accel, ray, mask: uint): bool
     RAY_TRACING_QUERY_ALL,    // (Accel, ray, mask: uint): RayQuery
     RAY_TRACING_QUERY_ANY,    // (Accel, ray, mask: uint): RayQuery
+
+    // ray tracing with motion blur
+    RAY_TRACING_INSTANCE_MOTION_MATRIX,    // (Accel, index: uint, key: uint): float4x4
+    RAY_TRACING_INSTANCE_MOTION_SRT,       // (Accel, index: uint, key: uint): SRT
+    RAY_TRACING_SET_INSTANCE_MOTION_MATRIX,// (Accel, index: uint, key: uint, transform: float4x4)
+    RAY_TRACING_SET_INSTANCE_MOTION_SRT,   // (Accel, index: uint, key: uint, transform: SRT)
+
+    RAY_TRACING_TRACE_CLOSEST_MOTION_BLUR,// (Accel, ray, time: float, mask: uint): TriangleHit
+    RAY_TRACING_TRACE_ANY_MOTION_BLUR,    // (Accel, ray, time: float, mask: uint): bool
+    RAY_TRACING_QUERY_ALL_MOTION_BLUR,    // (Accel, ray, time: float, mask: uint): RayQuery
+    RAY_TRACING_QUERY_ANY_MOTION_BLUR,    // (Accel, ray, time: float, mask: uint): RayQuery
 
     // ray query
     RAY_QUERY_WORLD_SPACE_RAY,         // (RayQuery): Ray
@@ -291,6 +320,7 @@ enum struct CallOp : uint32_t {
     RAY_QUERY_COMMIT_TRIANGLE,         // (RayQuery): void
     RAY_QUERY_COMMIT_PROCEDURAL,       // (RayQuery, float): void
     RAY_QUERY_TERMINATE,               // (RayQuery): void
+
     // For REAL rayquery
     RAY_QUERY_PROCEED,
     RAY_QUERY_IS_TRIANGLE_CANDIDATE,
@@ -329,11 +359,25 @@ enum struct CallOp : uint32_t {
     INDIRECT_SET_DISPATCH_KERNEL,// (Buffer, uint offset, uint3 block_size, uint3 dispatch_size, uint kernel_id)
     INDIRECT_SET_DISPATCH_COUNT, // (Buffer, uint count)
 
+    // texture direct sample
+
+    TEXTURE2D_SAMPLE,           // (tex, uv: float2, filter: uint, address: uint): float4
+    TEXTURE2D_SAMPLE_LEVEL,     // (tex, uv: float2, level: float, filter: uint, address: uint): float4
+    TEXTURE2D_SAMPLE_GRAD,      // (tex, uv: float2, ddx: float2, ddy: float2, filter: uint, address: uint): float4
+    TEXTURE2D_SAMPLE_GRAD_LEVEL,// (tex, uv: float2, ddx: float2, ddy: float2,  mip_clamp: float, filter: uint, address: uint): float4
+    TEXTURE3D_SAMPLE,           // (tex, uv: float3, filter: uint, address: uint): float4
+    TEXTURE3D_SAMPLE_LEVEL,     // (tex, uv: float3, level: float, filter: uint, address: uint): float4
+    TEXTURE3D_SAMPLE_GRAD,      // (tex, uv: float3, ddx: float3, ddy: float3, filter: uint, address: uint): float4
+    TEXTURE3D_SAMPLE_GRAD_LEVEL,// (tex, uv: float3, ddx: float3, ddy: float3,  mip_clamp: float, filter: uint, address: uint): float4
+
     // SER
     SHADER_EXECUTION_REORDER,// (uint hint, uint hint_bits): void
+
+    // Clock
+    CLOCK, // (): uint64
 };
 
-static constexpr size_t call_op_count = to_underlying(CallOp::SHADER_EXECUTION_REORDER) + 1u;
+static constexpr size_t call_op_count = to_underlying(CallOp::CLOCK) + 1u;
 
 [[nodiscard]] constexpr auto is_atomic_operation(CallOp op) noexcept {
     auto op_value = luisa::to_underlying(op);
@@ -404,11 +448,27 @@ public:
         return test(CallOp::RAY_TRACING_TRACE_CLOSEST) ||
                test(CallOp::RAY_TRACING_TRACE_ANY) ||
                test(CallOp::RAY_TRACING_QUERY_ALL) ||
-               test(CallOp::RAY_TRACING_QUERY_ANY);
+               test(CallOp::RAY_TRACING_QUERY_ANY) ||
+               test(CallOp::RAY_TRACING_TRACE_CLOSEST_MOTION_BLUR) ||
+               test(CallOp::RAY_TRACING_TRACE_ANY_MOTION_BLUR) ||
+               test(CallOp::RAY_TRACING_QUERY_ALL_MOTION_BLUR) ||
+               test(CallOp::RAY_TRACING_QUERY_ANY_MOTION_BLUR);
     }
     [[nodiscard]] auto uses_ray_query() const noexcept {
         return test(CallOp::RAY_TRACING_QUERY_ALL) ||
-               test(CallOp::RAY_TRACING_QUERY_ANY);
+               test(CallOp::RAY_TRACING_QUERY_ANY) ||
+               test(CallOp::RAY_TRACING_QUERY_ALL_MOTION_BLUR) ||
+               test(CallOp::RAY_TRACING_QUERY_ANY_MOTION_BLUR);
+    }
+    [[nodiscard]] auto uses_raytracing_motion_blur() const noexcept {
+        return test(CallOp::RAY_TRACING_TRACE_CLOSEST_MOTION_BLUR) ||
+               test(CallOp::RAY_TRACING_TRACE_ANY_MOTION_BLUR) ||
+               test(CallOp::RAY_TRACING_QUERY_ALL_MOTION_BLUR) ||
+               test(CallOp::RAY_TRACING_QUERY_ANY_MOTION_BLUR);
+    }
+    [[nodiscard]] auto uses_ray_query_motion_blur() const noexcept {
+        return test(CallOp::RAY_TRACING_QUERY_ALL_MOTION_BLUR) ||
+               test(CallOp::RAY_TRACING_QUERY_ANY_MOTION_BLUR);
     }
     [[nodiscard]] auto uses_atomic() const noexcept {
         return test(CallOp::ATOMIC_FETCH_ADD) ||

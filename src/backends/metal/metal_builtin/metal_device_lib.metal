@@ -8,6 +8,13 @@ using namespace metal;
 #define lc_assume(...) __builtin_assume(__VA_ARGS__)
 #define lc_assert(...)// TODO: implement assert?
 
+template<typename Ptr>
+[[nodiscard]] inline auto lc_address_of_impl(Ptr ptr) {
+    return reinterpret_cast<ulong>(ptr);
+}
+
+#define lc_address_of(object) lc_address_of_impl(&(object))
+
 template<typename T = void>
 [[noreturn]] inline T lc_unreachable() {
     __builtin_unreachable();
@@ -101,6 +108,11 @@ inline auto buffer_size(LCBuffer<T> buffer) {
 }
 
 template<typename T>
+[[nodiscard]] inline auto buffer_address(LCBuffer<T> buffer) {
+    return reinterpret_cast<ulong>(buffer.data);
+}
+
+template<typename T>
 [[nodiscard]] auto byte_buffer_read(LCBuffer<const lc_byte> buffer, ulong index) {
     return *reinterpret_cast<device const T *>(buffer.data + index);
 }
@@ -179,9 +191,77 @@ template<typename T, access a>
     return t.read(uv);
 }
 
+constant const sampler lc_samplers[16] = {
+    sampler(coord::normalized, address::clamp_to_edge, filter::nearest, mip_filter::none),
+    sampler(coord::normalized, address::repeat, filter::nearest, mip_filter::none),
+    sampler(coord::normalized, address::mirrored_repeat, filter::nearest, mip_filter::none),
+    sampler(coord::normalized, address::clamp_to_zero, filter::nearest, mip_filter::none),
+    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::none),
+    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::none),
+    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::none),
+    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::none),
+    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear, max_anisotropy(1)),
+    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::linear, max_anisotropy(1)),
+    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear, max_anisotropy(1)),
+    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear, max_anisotropy(1)),
+    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear, max_anisotropy(16)),
+    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::linear),          // FIXME: max_anisotropy(16) causes ICE
+    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear), // FIXME: max_anisotropy(16) causes ICE
+    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear),   // FIXME: max_anisotropy(16) causes ICE
+};
+
+[[nodiscard]] inline sampler get_sampler(uint code) {
+    __builtin_assume(code < 16u);
+    return lc_samplers[code];
+}
+
+[[nodiscard]] inline auto sampler_code_uint(uint filter, uint address) {
+  return get_sampler((filter << 2u) | address);
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample(texture2d<T, a> t, float2 uv, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uv);
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_level(texture2d<T, a> t, float2 uv, float lod, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uv, level(lod));
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_grad(texture2d<T, a> t, float2 uv, float2 dpdx, float2 dpdy, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uv, gradient2d(dpdx, dpdy));
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_grad_level(texture2d<T, a> t, float2 uv, float2 dpdx, float2 dpdy, float min_level, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uv, gradient2d(dpdx, dpdy), min_lod_clamp(min_level));
+}
+
 template<typename T, access a>
 [[nodiscard]] inline auto texture_read(texture3d<T, a> t, uint3 uvw) {
     return t.read(uvw);
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample(texture3d<T, a> t, float3 uvw, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uvw);
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_level(texture3d<T, a> t, float3 uvw, float lod, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uvw, level(lod));
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_grad(texture3d<T, a> t, float3 uvw, float3 dpdx, float3 dpdy, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uvw, gradient3d(dpdx, dpdy));
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_grad_level(texture3d<T, a> t, float3 uvw, float3 dpdx, float3 dpdy, float min_level, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uvw, gradient3d(dpdx, dpdy), min_lod_clamp(min_level));
 }
 
 template<typename T, access a>
@@ -466,31 +546,14 @@ struct LCBindlessArray {
     device const LCBindlessItem *items;
 };
 
-[[nodiscard]] sampler get_sampler(uint code) {
-    const array<sampler, 16u> samplers{
-        sampler(coord::normalized, address::clamp_to_edge, filter::nearest, mip_filter::none),
-        sampler(coord::normalized, address::repeat, filter::nearest, mip_filter::none),
-        sampler(coord::normalized, address::mirrored_repeat, filter::nearest, mip_filter::none),
-        sampler(coord::normalized, address::clamp_to_zero, filter::nearest, mip_filter::none),
-        sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::none),
-        sampler(coord::normalized, address::repeat, filter::linear, mip_filter::none),
-        sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::none),
-        sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::none),
-        sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear, max_anisotropy(1)),
-        sampler(coord::normalized, address::repeat, filter::linear, mip_filter::linear, max_anisotropy(1)),
-        sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear, max_anisotropy(1)),
-        sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear, max_anisotropy(1)),
-        sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear, max_anisotropy(16)),
-        sampler(coord::normalized, address::repeat, filter::linear, mip_filter::linear, max_anisotropy(16)),
-        sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear, max_anisotropy(16)),
-        sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear, max_anisotropy(16))};
-    __builtin_assume(code < 16u);
-    return samplers[code];
+[[nodiscard]] inline auto bindless_texture_sample2d(LCBindlessArray array, uint index, float2 uv) {
+    auto t = array.items[index];
+    return t.tex2d.sample(get_sampler(t.sampler2d), uv);
 }
 
-[[nodiscard]] inline auto bindless_texture_sample2d(LCBindlessArray array, uint index, float2 uv) {
-    device const auto &t = array.items[index];
-    return t.tex2d.sample(get_sampler(t.sampler2d), uv);
+[[nodiscard]] inline auto bindless_texture_sample2d_sample(LCBindlessArray array, uint index, float2 uv, uint filter, uint address) {
+    auto t = array.items[index];
+    return t.tex2d.sample(sampler_code_uint(filter, address), uv);
 }
 
 [[nodiscard]] inline auto bindless_texture_sample3d(LCBindlessArray array, uint index, float3 uvw) {
@@ -498,9 +561,19 @@ struct LCBindlessArray {
     return t.tex3d.sample(get_sampler(t.sampler3d), uvw);
 }
 
+[[nodiscard]] inline auto bindless_texture_sample3d_sample(LCBindlessArray array, uint index, float3 uvw, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex3d.sample(sampler_code_uint(filter, address), uvw);
+}
+
 [[nodiscard]] inline auto bindless_texture_sample2d_level(LCBindlessArray array, uint index, float2 uv, float lod) {
     device const auto &t = array.items[index];
     return t.tex2d.sample(get_sampler(t.sampler2d), uv, level(lod));
+}
+
+[[nodiscard]] inline auto bindless_texture_sample2d_level_sample(LCBindlessArray array, uint index, float2 uv, float lod, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex2d.sample(sampler_code_uint(filter, address), uv, level(lod));
 }
 
 [[nodiscard]] inline auto bindless_texture_sample3d_level(LCBindlessArray array, uint index, float3 uvw, float lod) {
@@ -508,9 +581,19 @@ struct LCBindlessArray {
     return t.tex3d.sample(get_sampler(t.sampler3d), uvw, level(lod));
 }
 
+[[nodiscard]] inline auto bindless_texture_sample3d_level_sample(LCBindlessArray array, uint index, float3 uvw, float lod, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex3d.sample(sampler_code_uint(filter, address), uvw, level(lod));
+}
+
 [[nodiscard]] inline auto bindless_texture_sample2d_grad(LCBindlessArray array, uint index, float2 uv, float2 dpdx, float2 dpdy) {
     device const auto &t = array.items[index];
     return t.tex2d.sample(get_sampler(t.sampler2d), uv, gradient2d(dpdx, dpdy));
+}
+
+[[nodiscard]] inline auto bindless_texture_sample2d_grad_sample(LCBindlessArray array, uint index, float2 uv, float2 dpdx, float2 dpdy, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex2d.sample(sampler_code_uint(filter, address), uv, gradient2d(dpdx, dpdy));
 }
 
 [[nodiscard]] inline auto bindless_texture_sample3d_grad(LCBindlessArray array, uint index, float3 uvw, float3 dpdx, float3 dpdy) {
@@ -518,14 +601,29 @@ struct LCBindlessArray {
     return t.tex3d.sample(get_sampler(t.sampler3d), uvw, gradient3d(dpdx, dpdy));
 }
 
+[[nodiscard]] inline auto bindless_texture_sample3d_grad_sample(LCBindlessArray array, uint index, float3 uvw, float3 dpdx, float3 dpdy, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex3d.sample(sampler_code_uint(filter, address), uvw, gradient3d(dpdx, dpdy));
+}
+
 [[nodiscard]] inline auto bindless_texture_sample2d_grad_level(LCBindlessArray array, uint index, float2 uv, float2 dpdx, float2 dpdy, float min_level) {
     device const auto &t = array.items[index];
     return t.tex2d.sample(get_sampler(t.sampler2d), uv, gradient2d(dpdx, dpdy), min_lod_clamp(min_level));
 }
 
+[[nodiscard]] inline auto bindless_texture_sample2d_grad_level_sample(LCBindlessArray array, uint index, float2 uv, float2 dpdx, float2 dpdy, float min_level, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex2d.sample(sampler_code_uint(filter, address), uv, gradient2d(dpdx, dpdy), min_lod_clamp(min_level));
+}
+
 [[nodiscard]] inline auto bindless_texture_sample3d_grad_level(LCBindlessArray array, uint index, float3 uvw, float3 dpdx, float3 dpdy, float min_level) {
     device const auto &t = array.items[index];
     return t.tex3d.sample(get_sampler(t.sampler3d), uvw, gradient3d(dpdx, dpdy), min_lod_clamp(min_level));
+}
+
+[[nodiscard]] inline auto bindless_texture_sample3d_grad_level_sample(LCBindlessArray array, uint index, float3 uvw, float3 dpdx, float3 dpdy, float min_level, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex3d.sample(sampler_code_uint(filter, address), uvw, gradient3d(dpdx, dpdy), min_lod_clamp(min_level));
 }
 
 [[nodiscard]] inline auto bindless_texture_size2d(LCBindlessArray array, uint i) {
@@ -583,14 +681,18 @@ inline void bindless_buffer_write(LCBindlessArray array, uint buffer_index, uint
     return 0ull;// TODO
 }
 
+[[nodiscard]] inline auto bindless_buffer_address(LCBindlessArray array, uint buffer_index) {
+    return reinterpret_cast<ulong>(array.items[buffer_index].buffer);
+}
+
 template<typename T>
-[[nodiscard]] inline auto bindless_byte_address_buffer_read(LCBindlessArray array, uint buffer_index, uint offset) {
-    return reinterpret_cast<device const T *>(static_cast<device const char *>(array.items[buffer_index].buffer) + offset);
+[[nodiscard]] inline auto bindless_byte_address_buffer_read(LCBindlessArray array, uint buffer_index, ulong offset) {
+    return *reinterpret_cast<device const T *>(bindless_buffer_address(array, buffer_index) + offset);
 }
 
 template<typename T>
 inline void bindless_byte_address_buffer_write(LCBindlessArray array, uint buffer_index, uint offset, T value) {
-    *reinterpret_cast<device T *>(static_cast<device char *>(array.items[buffer_index].buffer) + offset) = value;
+    *reinterpret_cast<device T *>(bindless_buffer_address(array, buffer_index) + offset) = value;
 }
 
 using namespace metal::raytracing;
@@ -633,13 +735,21 @@ struct alignas(16) LCInstance {
 static_assert(sizeof(LCInstance) == 64u, "");
 
 struct LCAccel {
+#ifdef LUISA_ENABLE_MOTION_BLUR
+    acceleration_structure<instancing, primitive_motion, instance_motion> handle;
+#else
     instance_acceleration_structure handle;
+#endif
     device LCInstance *__restrict__ instances;
 };
 
 [[nodiscard]] inline auto lc_intersector_base() {
 #ifdef LUISA_ENABLE_CURVE
+#ifdef LUISA_ENABLE_MOTION_BLUR
+    intersector<triangle_data, curve_data, instancing, primitive_motion, instance_motion> i;
+#else
     intersector<triangle_data, curve_data, instancing> i;
+#endif
     i.assume_geometry_type(geometry_type::triangle | geometry_type::curve);
     i.assume_curve_type(curve_type::round);
 #ifdef LUISA_ENABLE_CURVE_MULTIPLE
@@ -664,7 +774,11 @@ struct LCAccel {
     i.assume_curve_control_point_count(2u);
 #endif
 #else
+#ifdef LUISA_ENABLE_MOTION_BLUR
+    intersector<triangle_data, instancing, primitive_motion, instance_motion> i;
+#else
     intersector<triangle_data, instancing> i;
+#endif
     i.assume_geometry_type(geometry_type::triangle);
 #endif
     i.force_opacity(forced_opacity::opaque);
@@ -689,8 +803,12 @@ struct LCAccel {
     return ray{o, d, r_in.m1, r_in.m3};
 }
 
-[[nodiscard]] inline auto accel_trace_closest(LCAccel accel, LCRay r, uint mask) {
+[[nodiscard]] inline auto accel_trace_closest_impl(LCAccel accel, LCRay r, uint mask, float time = 0.f) {
+#ifdef LUISA_ENABLE_MOTION_BLUR
+    auto isect = intersector_closest().intersect(make_ray(r), accel.handle, mask, time);
+#else
     auto isect = intersector_closest().intersect(make_ray(r), accel.handle, mask);
+#endif
     return isect.type == intersection_type::none ?
                LCTriangleHit{0xffffffffu, 0xffffffffu, float2(0.f), 0.f} :
 #ifdef LUISA_ENABLE_CURVE
@@ -708,36 +826,99 @@ struct LCAccel {
 #endif
 }
 
-[[nodiscard]] inline auto accel_trace_any(LCAccel accel, LCRay r, uint mask) {
+[[nodiscard]] inline auto accel_trace_any_impl(LCAccel accel, LCRay r, uint mask, float time = 0.f) {
+#ifdef LUISA_ENABLE_MOTION_BLUR
+    auto isect = intersector_any().intersect(make_ray(r), accel.handle, mask, time);
+#else
     auto isect = intersector_any().intersect(make_ray(r), accel.handle, mask);
+#endif
     return isect.type != intersection_type::none;
 }
 
+[[nodiscard]] inline auto accel_trace_closest(LCAccel accel, LCRay r, uint mask) {
+    return accel_trace_closest_impl(accel, r, mask, 0.f);
+}
+
+[[nodiscard]] inline auto accel_trace_any(LCAccel accel, LCRay r, uint mask) {
+    return accel_trace_any_impl(accel, r, mask, 0.f);
+}
+
+#ifdef LUISA_ENABLE_MOTION_BLUR
+[[nodiscard]] inline auto accel_trace_closest_motion_blur(LCAccel accel, LCRay r, float time, uint mask) {
+    return accel_trace_closest_impl(accel, r, mask, time);
+}
+
+[[nodiscard]] inline auto accel_trace_any_motion_blur(LCAccel accel, LCRay r, float time, uint mask) {
+    return accel_trace_any_impl(accel, r, mask, time);
+}
+#endif
+
+#ifdef LUISA_ENABLE_RAY_QUERY
+
 struct LCRayQuery {
+#ifdef LUISA_ENABLE_MOTION_BLUR
+    acceleration_structure<instancing, primitive_motion, instance_motion> accel;
+#else
     instance_acceleration_structure accel;
+#endif
     ray ray;
     uint mask;
+    float time;
     bool terminate_on_first_hit;
 #ifdef LUISA_ENABLE_CURVE
+#ifdef LUISA_ENABLE_MOTION_BLUR
+    thread intersection_query<triangle_data, curve_data, instancing, primitive_motion, instance_motion> *i;
+#else
     thread intersection_query<triangle_data, curve_data, instancing> *i;
+#endif
+#else
+#ifdef LUISA_ENABLE_MOTION_BLUR
+    thread intersection_query<triangle_data, instancing, primitive_motion, instance_motion> *i;
 #else
     thread intersection_query<triangle_data, instancing> *i;
 #endif
+#endif
 };
 
+[[nodiscard]] inline auto accel_query_all_impl(LCAccel accel, LCRay ray, uint mask, float time) {
+    return LCRayQuery{accel.handle, make_ray(ray), mask, time, false, nullptr};
+}
+
+[[nodiscard]] inline auto accel_query_any_impl(LCAccel accel, LCRay ray, uint mask, float time) {
+    return LCRayQuery{accel.handle, make_ray(ray), mask, time, true, nullptr};
+}
+
 [[nodiscard]] inline auto accel_query_all(LCAccel accel, LCRay ray, uint mask) {
-    return LCRayQuery{accel.handle, make_ray(ray), mask, false, nullptr};
+    return accel_query_all_impl(accel, ray, mask, 0.f);
 }
 
 [[nodiscard]] inline auto accel_query_any(LCAccel accel, LCRay ray, uint mask) {
-    return LCRayQuery{accel.handle, make_ray(ray), mask, true, nullptr};
+    return accel_query_any_impl(accel, ray, mask, 0.f);
 }
+
+#ifdef LUISA_ENABLE_MOTION_BLUR
+[[nodiscard]] inline auto accel_query_all_motion_blur(LCAccel accel, LCRay ray, float time, uint mask) {
+    return accel_query_all_impl(accel, ray, mask, time);
+}
+
+[[nodiscard]] inline auto accel_query_any_motion_blur(LCAccel accel, LCRay ray, float time, uint mask) {
+    return accel_query_any_impl(accel, ray, mask, time);
+}
+#endif
 
 void ray_query_init(thread LCRayQuery &q,
 #ifdef LUISA_ENABLE_CURVE
+#ifdef LUISA_ENABLE_MOTION_BLUR
+                    thread intersection_query<triangle_data, curve_data, instancing, primitive_motion, instance_motion> &i,
+#else
                     thread intersection_query<triangle_data, curve_data, instancing> &i,
+#endif
+#else
+#ifdef LUISA_ENABLE_MOTION_BLUR
+                    thread intersection_query<triangle_data, instancing, primitive_motion, instance_motion> &i,
 #else
                     thread intersection_query<triangle_data, instancing> &i,
+#endif
 #endif
                     bool has_procedural_branch) {
     intersection_params params;
@@ -778,11 +959,21 @@ void ray_query_init(thread LCRayQuery &q,
 }
 
 #ifdef LUISA_ENABLE_CURVE
+#ifdef LUISA_ENABLE_MOTION_BLUR
+#define LC_RAY_QUERY_SHADOW_VARIABLE(q) \
+    intersection_query<triangle_data, curve_data, instancing, primitive_motion, instance_motion> q##_i
+#else
 #define LC_RAY_QUERY_SHADOW_VARIABLE(q) \
     intersection_query<triangle_data, curve_data, instancing> q##_i
+#endif
+#else
+#ifdef LUISA_ENABLE_MOTION_BLUR
+#define LC_RAY_QUERY_SHADOW_VARIABLE(q) \
+    intersection_query<triangle_data, instancing, primitive_motion, instance_motion> q##_i
 #else
 #define LC_RAY_QUERY_SHADOW_VARIABLE(q) \
     intersection_query<triangle_data, instancing> q##_i
+#endif
 #endif
 
 #define LC_RAY_QUERY_INIT(q) ray_query_init(q, q##_i, true)
@@ -875,12 +1066,18 @@ inline void ray_query_commit_triangle(LCRayQuery q) {
 }
 
 inline void ray_query_commit_procedural(LCRayQuery q, float t) {
-    q.i->commit_bounding_box_intersection(t);
+    auto current_min = q.i->get_ray_min_distance();
+    auto current_max = q.i->get_committed_distance();
+    if (t >= current_min && t <= current_max) {
+        q.i->commit_bounding_box_intersection(t);
+    }
 }
 
 inline void ray_query_terminate(LCRayQuery q) {
     q.i->abort();
 }
+
+#endif
 
 [[nodiscard]] inline auto accel_instance_transform(LCAccel accel, uint i) {
     auto m = accel.instances[i].transform;

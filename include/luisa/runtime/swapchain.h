@@ -23,6 +23,7 @@ public:
 private:
     friend class Device;
     friend class ResourceGenerator;
+    friend class DXHDRExt;
     PixelStorage _storage{};
     Swapchain(DeviceInterface *device, const SwapchainCreationInfo &create_info) noexcept;
     Swapchain(DeviceInterface *device, const SwapchainOption &option, uint64_t stream_handle) noexcept;

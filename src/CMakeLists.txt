@@ -38,6 +38,7 @@ endif ()
 add_subdirectory(core)
 add_subdirectory(vstl)
 add_subdirectory(ast)
+add_subdirectory(xir)
 add_subdirectory(rust)
 add_subdirectory(runtime)
 add_subdirectory(ir)
@@ -47,15 +48,14 @@ add_subdirectory(osl)
 add_subdirectory(gui)
 add_subdirectory(backends)
 add_subdirectory(api)
-add_subdirectory(ir_v2)
 add_subdirectory(clangcxx)
 
 add_library(compute INTERFACE)
 
 target_link_libraries(compute INTERFACE
         luisa-compute-core
-        luisa-compute-vstl
         luisa-compute-ast
+        luisa-compute-xir
         luisa-compute-dsl
         luisa-compute-osl
         luisa-compute-runtime
@@ -63,7 +63,6 @@ target_link_libraries(compute INTERFACE
         luisa-compute-api
         luisa-compute-backends
         luisa-compute-ir
-        luisa-compute-ir-v2
         luisa-compute-clangcxx)
 
 if (LUISA_COMPUTE_ENABLE_CUDA_EXT_LCUB)

@@ -2,10 +2,14 @@
 
 #include <luisa/runtime/rhi/device_interface.h>
 #include <luisa/runtime/image.h>
+
 namespace luisa::compute {
+
 template<typename T>
 class BufferView;
+
 class Stream;
+
 template<typename T>
 class Image;
 
@@ -16,11 +20,22 @@ protected:
 
 public:
     static constexpr luisa::string_view name = "TexCompressExt";
+
+// avoid macro pollution from X11
+#ifdef Success
+#undef Success
+#endif
+
+#ifdef Failed
+#undef Failed
+#endif
+
     enum class Result : int8_t {
         NotImplemented = -1,
         Success = 0,
         Failed = 1
     };
+
     // TODO: astc
     virtual Result compress_bc6h(Stream &stream,
                                  const ImageView<float> &src,

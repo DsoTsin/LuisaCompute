@@ -8,9 +8,11 @@
 #ifdef LUISA_ENABLE_API
 #include <luisa/api/common.h>
 #endif
+
 namespace lc::validation {
 class Device;
 }// namespace lc::validation
+
 namespace luisa::compute {
 
 class LC_RUNTIME_API CommandList : concepts::Noncopyable {

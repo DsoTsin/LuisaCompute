@@ -43,6 +43,7 @@ public:
         CAST,
         TYPE_ID,
         STRING_ID,
+        FUNC_REF,
         CPUCUSTOM,
         GPUCUSTOM
     };
@@ -89,6 +90,7 @@ class CallExpr;
 class CastExpr;
 class TypeIDExpr;
 class StringIDExpr;
+class FuncRefExpr;
 class CpuCustomOpExpr;
 class GpuCustomOpExpr;
 
@@ -104,6 +106,7 @@ struct LC_AST_API ExprVisitor {
     virtual void visit(const CastExpr *) = 0;
     virtual void visit(const TypeIDExpr *) = 0;
     virtual void visit(const StringIDExpr *) = 0;
+    virtual void visit(const FuncRefExpr *);
     virtual void visit(const CpuCustomOpExpr *);
     virtual void visit(const GpuCustomOpExpr *);
     virtual ~ExprVisitor() noexcept = default;
@@ -526,6 +529,19 @@ public:
     LUISA_EXPRESSION_COMMON()
 };
 
+class LC_AST_API FuncRefExpr final : public Expression {
+    detail::FunctionBuilder const *_func;
+    FuncRefExpr() = default;
+
+protected:
+    void _mark(Usage) const noexcept override {}
+    [[nodiscard]] uint64_t _compute_hash() const noexcept override;
+public:
+    [[nodiscard]] auto func() const noexcept { return _func; }
+    FuncRefExpr(detail::FunctionBuilder const *func) noexcept : Expression(Tag::FUNC_REF, Type::of<uint64_t>()), _func{func} {}
+    LUISA_EXPRESSION_COMMON()
+};
+
 class CpuCustomOpExpr final : public Expression {
 
 public:
@@ -620,6 +636,7 @@ void traverse_subexpressions(const Expression *expr,
             traverse_subexpressions(cast_expr->expression(), enter, exit);
             break;
         }
+        case Expression::Tag::FUNC_REF:
         case Expression::Tag::TYPE_ID:
         case Expression::Tag::STRING_ID:
         case Expression::Tag::CPUCUSTOM:

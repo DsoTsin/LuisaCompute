@@ -10,11 +10,12 @@ LCSwapChain::LCSwapChain(
     HWND windowHandle,
     uint width,
     uint height,
-    bool allowHDR,
+    DXGI_FORMAT format,
     bool vsync,
     uint backBufferCount)
     : Resource(device), vsync(vsync) {
-    auto frameCount = backBufferCount + 1;
+    this->format = format;
+    frameCount = backBufferCount + 1;
     vstd::push_back_func(
         m_renderTargets,
         frameCount,
@@ -23,32 +24,43 @@ LCSwapChain::LCSwapChain(
     swapChainDesc.BufferCount = frameCount;
     swapChainDesc.Width = width;
     swapChainDesc.Height = height;
-    swapChainDesc.Format = allowHDR ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_R8G8B8A8_UNORM;
+    swapChainDesc.Format = format;
     swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     if (!vsync)
         swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING | DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+    swapChainDesc.Flags |= DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
     swapChainDesc.SampleDesc.Count = 1;
     {
         IDXGISwapChain1 *localSwap;
         ThrowIfFailed(device->dxgiFactory->CreateSwapChainForHwnd(
             queue->Queue(),
             windowHandle,
+
             &swapChainDesc,
             nullptr,
             nullptr,
             &localSwap));
-        swapChain = DxPtr(static_cast<IDXGISwapChain3 *>(localSwap), true);
+
+        swapChain = DxPtr(localSwap, true);
     }
     for (uint32_t n = 0; n < frameCount; n++) {
         ThrowIfFailed(swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n].rt)));
     }
-    swapChain->SetMaximumFrameLatency(backBufferCount);
+    if (!vsync) {
+        ComPtr<IDXGISwapChain3> swapChain3;
+        auto hr = swapChain->QueryInterface(IID_PPV_ARGS(&swapChain3));
+        if (hr == S_OK) {
+            swapChain3->SetMaximumFrameLatency(backBufferCount * 2);
+        } else {
+            LUISA_WARNING("Can not get IDXGISwapChain3, please check your Direct-X runtime.");
+        }
+    }
 }
 LCSwapChain::LCSwapChain(
     PixelStorage &storage,
     Device *device,
-    IDXGISwapChain3 *swapChain,
+    IDXGISwapChain1 *swapChain,
     bool vsync)
     : Resource(device),
       swapChain(swapChain, false),
@@ -59,6 +71,7 @@ LCSwapChain::LCSwapChain(
         m_renderTargets,
         swapChainDesc.BufferCount,
         [&] { return device; });
+    frameCount = swapChainDesc.BufferCount;
     for (uint32_t n = 0; n < swapChainDesc.BufferCount; n++) {
         ThrowIfFailed(swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n].rt)));
     }

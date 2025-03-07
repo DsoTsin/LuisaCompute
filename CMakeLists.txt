@@ -33,8 +33,9 @@ else ()
     option(LUISA_COMPUTE_ENABLE_METAL "Enable Metal backend" ON)
     option(LUISA_COMPUTE_ENABLE_CUDA "Enable CUDA backend" ON)
     option(LUISA_COMPUTE_ENABLE_CUDA_EXT_LCUB "Enable CUDA extension: LCUB" OFF)
-    option(LUISA_COMPUTE_ENABLE_VULKAN "Enable Vulkan backend" ON)
+    option(LUISA_COMPUTE_ENABLE_VULKAN "Enable Vulkan backend" OFF)
     option(LUISA_COMPUTE_ENABLE_CPU "Enable CPU backend" ON)
+    option(LUISA_COMPUTE_ENABLE_FALLBACK "Enable Fallback backend" ON)
     option(LUISA_COMPUTE_ENABLE_REMOTE "Enable Remote backend" ON)
     option(LUISA_COMPUTE_ENABLE_GUI "Enable GUI support" ON)
     option(LUISA_COMPUTE_ENABLE_CLANG_CXX "Enable ClangTooling-based C++ shading language" OFF)
@@ -42,6 +43,7 @@ else ()
     option(LUISA_COMPUTE_EMBREE_ZIP_PATH "Path to embree zip file. Use this if embree fails to download" "")
 endif ()
 
+option(LUISA_COMPUTE_ENABLE_SANITIZERS "Enable sanitizers" OFF)
 option(LUISA_COMPUTE_ENABLE_UNITY_BUILD "Enable unity build (which might accelerate the compilation but could break VS Code's clangd indexing)" OFF)
 option(LUISA_COMPUTE_CHECK_BACKEND_DEPENDENCIES "Check dependencies of backends (and disable the unsatisfied ones instead of reporting a configuration error)" ON)
 
@@ -124,6 +126,19 @@ elseif (UNIX)
     endif ()
 endif ()
 
+# sanitizers
+if (LUISA_COMPUTE_ENABLE_SANITIZERS)
+    if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+        set(LUISA_COMPUTE_SANITIZER_FLAGS "/fsanitize=address")
+        target_compile_options(luisa-compute-include INTERFACE ${LUISA_COMPUTE_SANITIZER_FLAGS})
+    else ()
+        set(LUISA_COMPUTE_SANITIZER_FLAGS "-fsanitize=address" "-fsanitize=leak" "-fsanitize=undefined")
+        target_compile_options(luisa-compute-include INTERFACE ${LUISA_COMPUTE_SANITIZER_FLAGS})
+        target_link_options(luisa-compute-include INTERFACE ${LUISA_COMPUTE_SANITIZER_FLAGS})
+    endif ()
+    mark_as_advanced(LUISA_COMPUTE_SANITIZER_FLAGS)
+endif ()
+
 if (LUISA_COMPUTE_ENABLE_DSL)
     target_compile_definitions(luisa-compute-include INTERFACE LUISA_ENABLE_DSL=1)
 endif ()
@@ -134,5 +149,12 @@ install(TARGETS luisa-compute-include
 install(DIRECTORY include/luisa
         DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
         FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp")
+
+# Global definition to avoid MSVC ABI break.
+# See https://github.com/microsoft/STL/releases/tag/vs-2022-17.10 for details.
+if (WIN32)
+    add_compile_definitions(_DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
+    target_compile_definitions(luisa-compute-include INTERFACE _DISABLE_CONSTEXPR_MUTEX_CONSTRUCTOR)
+endif ()
 
 add_subdirectory(src)

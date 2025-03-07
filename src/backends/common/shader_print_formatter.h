@@ -197,6 +197,8 @@ public:
     ~ShaderPrintFormatter() noexcept = default;
 
 public:
+    [[nodiscard]] auto size() const noexcept { return _size; }
+
     bool operator()(luisa::string &scratch, luisa::span<const std::byte> item) const noexcept {
         if (item.size() < _size) { return false; }
         for (auto i = 0u; i < _offsets.size(); i++) {

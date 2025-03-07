@@ -425,10 +425,13 @@ public:
     [[nodiscard]] bool is_uint32() const noexcept;
     [[nodiscard]] bool is_int64() const noexcept;
     [[nodiscard]] bool is_uint64() const noexcept;
+    [[nodiscard]] bool is_float16() const noexcept;
     [[nodiscard]] bool is_float32() const noexcept;
+    [[nodiscard]] bool is_float64() const noexcept;
+    [[nodiscard]] bool is_int8() const noexcept;
+    [[nodiscard]] bool is_uint8() const noexcept;
     [[nodiscard]] bool is_int16() const noexcept;
     [[nodiscard]] bool is_uint16() const noexcept;
-    [[nodiscard]] bool is_float16() const noexcept;
     /// Arithmetic = float || int || uint
     [[nodiscard]] bool is_arithmetic() const noexcept;
 
@@ -439,12 +442,15 @@ public:
     [[nodiscard]] bool is_bool_vector() const noexcept;
     [[nodiscard]] bool is_int32_vector() const noexcept;
     [[nodiscard]] bool is_uint32_vector() const noexcept;
+    [[nodiscard]] bool is_float16_vector() const noexcept;
     [[nodiscard]] bool is_float32_vector() const noexcept;
+    [[nodiscard]] bool is_float64_vector() const noexcept;
+    [[nodiscard]] bool is_int8_vector() const noexcept;
+    [[nodiscard]] bool is_uint8_vector() const noexcept;
     [[nodiscard]] bool is_int16_vector() const noexcept;
     [[nodiscard]] bool is_uint16_vector() const noexcept;
     [[nodiscard]] bool is_int64_vector() const noexcept;
     [[nodiscard]] bool is_uint64_vector() const noexcept;
-    [[nodiscard]] bool is_float16_vector() const noexcept;
     [[nodiscard]] bool is_matrix() const noexcept;
     [[nodiscard]] bool is_structure() const noexcept;
     [[nodiscard]] bool is_buffer() const noexcept;

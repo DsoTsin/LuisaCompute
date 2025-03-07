@@ -34,20 +34,20 @@ struct luisa_compute_extension {};
 
 #define LUISA_DERIVE_FMT_MAP_STRUCT_FIELD(x) fmt::format(FMT_STRING(#x ": {}"), input.x)
 
-#define LUISA_DERIVE_FMT(Struct, DisplayName, ...)                                    \
-    template<>                                                                        \
-    struct fmt::formatter<Struct> {                                                   \
-        constexpr auto parse(format_parse_context &ctx) -> decltype(ctx.begin()) {    \
-            return ctx.end();                                                         \
-        }                                                                             \
-        template<typename FormatContext>                                              \
-        auto format(const Struct &input, FormatContext &ctx) -> decltype(ctx.out()) { \
-            return fmt::format_to(ctx.out(), FMT_STRING(#DisplayName "{{ {} }}"),     \
-                                  fmt::join(std::array{LUISA_MAP_LIST(                \
-                                                LUISA_DERIVE_FMT_MAP_STRUCT_FIELD,    \
-                                                __VA_ARGS__)},                        \
-                                            ", "));                                   \
-        }                                                                             \
+#define LUISA_DERIVE_FMT(Struct, DisplayName, ...)                                          \
+    template<>                                                                              \
+    struct fmt::formatter<Struct> {                                                         \
+        constexpr auto parse(format_parse_context &ctx) const -> decltype(ctx.begin()) {    \
+            return ctx.end();                                                               \
+        }                                                                                   \
+        template<typename FormatContext>                                                    \
+        auto format(const Struct &input, FormatContext &ctx) const -> decltype(ctx.out()) { \
+            return fmt::format_to(ctx.out(), FMT_STRING(#DisplayName "{{ {} }}"),           \
+                                  fmt::join(std::array{LUISA_MAP_LIST(                      \
+                                                LUISA_DERIVE_FMT_MAP_STRUCT_FIELD,          \
+                                                __VA_ARGS__)},                              \
+                                            ", "));                                         \
+        }                                                                                   \
     };
 
 #define LUISA_DERIVE_DSL_STRUCT(S, ...)                                                       \
@@ -311,8 +311,7 @@ struct luisa_compute_extension {};
         const Expression *_expression;                                                       \
                                                                                              \
     public:                                                                                  \
-        explicit Ref(const Expression *e) noexcept                                           \
-            : _expression{e} {}                                                              \
+        explicit Ref(const Expression *e) noexcept : _expression{e} {}                       \
         [[nodiscard]] auto expression() const noexcept { return this->_expression; }         \
         Ref(Ref &&another) noexcept = default;                                               \
         Ref(const Ref &another) noexcept = default;                                          \

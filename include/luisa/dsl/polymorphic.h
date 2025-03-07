@@ -41,27 +41,34 @@ public:
 
     template<typename Tag>
         requires is_integral_expr_v<Tag>
-    void dispatch(Tag &&tag, const luisa::function<void(const T *)> &f) const noexcept {
+    void dispatch_with_default(Tag &&tag,
+                               const luisa::function<void(const T *)> &f,
+                               const luisa::function<void()> &default_case = ([] {})) const noexcept {
         if (empty()) [[unlikely]] {
             detail::polymorphic_warning_no_implementation_registered();
         }
-        if (_impl.size() == 1u) {
+        if (_impl.size() == 1u && !default_case) {
             f(impl(0u));
         } else {
             detail::SwitchStmtBuilder{std::forward<Tag>(tag)} % [&] {
                 for (auto i = 0u; i < _impl.size(); i++) {
                     detail::SwitchCaseStmtBuilder{i} % [&f, this, i] { f(impl(i)); };
                 }
-                detail::SwitchDefaultStmtBuilder{} %
-                    [] { unreachable(); };
+                if (default_case) {
+                    detail::SwitchDefaultStmtBuilder{} % default_case;
+                } else {
+                    detail::SwitchDefaultStmtBuilder{} %
+                        [] { unreachable(); };
+                }
             };
         }
     }
 
     template<typename Tag>
         requires is_integral_expr_v<Tag>
-    void dispatch_range(Tag &&tag, uint lo, uint hi,
-                        const luisa::function<void(const T *)> &f) const noexcept {
+    void dispatch_range_with_default(Tag &&tag, uint lo, uint hi,
+                                     const luisa::function<void(const T *)> &f,
+                                     const luisa::function<void()> &default_case = ([] {})) const noexcept {
         if (lo > hi) { detail::polymorphic_error_unordered_tag_range(lo, hi); }
         if (hi > _impl.size()) [[unlikely]] {
             LUISA_WARNING_WITH_LOCATION(
@@ -73,23 +80,28 @@ public:
         if (hi == lo) [[unlikely]] {
             detail::polymorphic_warning_empty_tag_range(lo, hi);
         }
-        if (hi == lo + 1u) {// only one implementation
+        if (hi == lo + 1u && !default_case) {// only one implementation
             f(impl(lo));
         } else {
             detail::SwitchStmtBuilder{std::forward<Tag>(tag)} % [&] {
                 for (auto i = lo; i < hi; i++) {
                     detail::SwitchCaseStmtBuilder{i} % [&f, this, i] { f(impl(i)); };
                 }
-                detail::SwitchDefaultStmtBuilder{} %
-                    [] { unreachable(); };
+                if (default_case) {
+                    detail::SwitchDefaultStmtBuilder{} % default_case;
+                } else {
+                    detail::SwitchDefaultStmtBuilder{} %
+                        [] { unreachable(); };
+                }
             };
         }
     }
 
     template<typename Tag, typename Group>
         requires is_integral_expr_v<Tag>
-    void dispatch_group(Tag &&tag, const Group &group,
-                        const luisa::function<void(const T *)> &f) const noexcept {
+    void dispatch_group_with_default(Tag &&tag, const Group &group,
+                                     const luisa::function<void(const T *)> &f,
+                                     const luisa::function<void()> &default_case = ([] {})) const noexcept {
         luisa::vector<uint> tags;
         tags.reserve(std::size(group));
         for (auto &&t : group) {
@@ -108,17 +120,41 @@ public:
             detail::polymorphic_warning_empty_tag_group();
         }
         LUISA_ASSERT(group.size() > 0, "Empty polymorphic tag group.");
-        if (tags.size() == 1u) {
+        if (tags.size() == 1u && !default_case) {
             f(impl(tags.front()));
         } else {
             detail::SwitchStmtBuilder{std::forward<Tag>(tag)} % [&] {
                 for (auto t : tags) {
                     detail::SwitchCaseStmtBuilder{t} % [&f, this, t] { f(impl(t)); };
                 }
-                detail::SwitchDefaultStmtBuilder{} %
-                    [] { unreachable(); };
+                if (default_case) {
+                    detail::SwitchDefaultStmtBuilder{} % default_case;
+                } else {
+                    detail::SwitchDefaultStmtBuilder{} %
+                        [] { unreachable(); };
+                }
             };
         }
+    }
+
+    template<typename Tag>
+        requires is_integral_expr_v<Tag>
+    void dispatch(Tag &&tag, const luisa::function<void(const T *)> &f) const noexcept {
+        dispatch_with_default(std::forward<Tag>(tag), f, {});
+    }
+
+    template<typename Tag>
+        requires is_integral_expr_v<Tag>
+    void dispatch_range(Tag &&tag, uint lo, uint hi,
+                        const luisa::function<void(const T *)> &f) const noexcept {
+        dispatch_range_with_default(std::forward<Tag>(tag), lo, hi, f, {});
+    }
+
+    template<typename Tag, typename Group>
+        requires is_integral_expr_v<Tag>
+    void dispatch_group(Tag &&tag, const Group &group,
+                        const luisa::function<void(const T *)> &f) const noexcept {
+        dispatch_group_with_default(std::forward<Tag>(tag), group, f, {});
     }
 };
 

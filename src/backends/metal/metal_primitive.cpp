@@ -42,9 +42,11 @@ void MetalPrimitive::_do_build(MetalCommandEncoder &encoder,
         if (_update_buffer == nullptr ||
             _update_buffer->length() < sizes.refitScratchBufferSize) {
             if (_update_buffer != nullptr) { _update_buffer->release(); }
-            _update_buffer = device->newBuffer(sizes.refitScratchBufferSize,
-                                               MTL::ResourceHazardTrackingModeTracked |
-                                                   MTL::ResourceStorageModePrivate);
+            if (sizes.refitScratchBufferSize != 0) {
+                _update_buffer = device->newBuffer(sizes.refitScratchBufferSize,
+                                                   MTL::ResourceHazardTrackingModeTracked |
+                                                       MTL::ResourceStorageModePrivate);
+            }
         }
     }
     if (_handle != nullptr) { _handle->release(); }
@@ -99,12 +101,11 @@ void MetalPrimitive::_do_update(MetalCommandEncoder &encoder,
                                 MTL::PrimitiveAccelerationStructureDescriptor *descriptor) noexcept {
 
     LUISA_ASSERT(_handle != nullptr, "Acceleration structure not built yet.");
-    LUISA_ASSERT(_update_buffer != nullptr, "Invalid acceleration structure update buffer.");
     LUISA_ASSERT(descriptor != nullptr, "Invalid acceleration structure descriptor.");
 
     auto refit_encoder = encoder.command_buffer()->accelerationStructureCommandEncoder();
     _handle->retain();
-    _update_buffer->retain();
+    if (_update_buffer != nullptr) { _update_buffer->retain(); }
     descriptor->retain();
     refit_encoder->refitAccelerationStructure(_handle, descriptor, _handle, _update_buffer, 0u);
     refit_encoder->endEncoding();
@@ -112,9 +113,27 @@ void MetalPrimitive::_do_update(MetalCommandEncoder &encoder,
                                                           update_buffer = _update_buffer,
                                                           descriptor] {
         handle->release();
-        update_buffer->release();
         descriptor->release();
+        if (update_buffer != nullptr) { update_buffer->release(); }
     }));
+}
+
+void MetalPrimitive::_set_motion_options(MTL::PrimitiveAccelerationStructureDescriptor *descriptor) noexcept {
+    if (auto m = _option.motion) {
+        descriptor->setMotionKeyframeCount(m.keyframe_count);
+        descriptor->setMotionStartTime(m.time_start);
+        descriptor->setMotionEndTime(m.time_end);
+        if (m.should_vanish_start) {
+            descriptor->setMotionStartBorderMode(MTL::MotionBorderModeVanish);
+        } else {
+            descriptor->setMotionStartBorderMode(MTL::MotionBorderModeClamp);
+        }
+        if (m.should_vanish_end) {
+            descriptor->setMotionEndBorderMode(MTL::MotionBorderModeVanish);
+        } else {
+            descriptor->setMotionEndBorderMode(MTL::MotionBorderModeClamp);
+        }
+    }
 }
 
 void MetalPrimitive::set_name(luisa::string_view name) noexcept {
@@ -132,4 +151,3 @@ void MetalPrimitive::set_name(luisa::string_view name) noexcept {
 }
 
 }// namespace luisa::compute::metal
-

@@ -132,7 +132,7 @@ LUISA_MAKE_VECTOR_BINARY_FUNC(fmod)
 
 [[nodiscard]] inline auto isnan(float x) noexcept {
     auto u = 0u;
-    ::memcpy(&u, &x, sizeof(float));
+    std::memcpy(&u, &x, sizeof(float));
     return (u & 0x7f800000u) == 0x7f800000u && (u & 0x007fffffu) != 0u;
 }
 [[nodiscard]] inline auto isnan(float2 v) noexcept { return make_bool2(isnan(v.x), isnan(v.y)); }
@@ -141,7 +141,7 @@ LUISA_MAKE_VECTOR_BINARY_FUNC(fmod)
 
 [[nodiscard]] inline auto isinf(float x) noexcept {
     auto u = 0u;
-    ::memcpy(&u, &x, sizeof(float));
+    std::memcpy(&u, &x, sizeof(float));
     return (u & 0x7f800000u) == 0x7f800000u && (u & 0x007fffffu) == 0u;
 }
 [[nodiscard]] inline auto isinf(float2 v) noexcept { return make_bool2(isinf(v.x), isinf(v.y)); }
@@ -469,6 +469,10 @@ template<size_t N>
         v.x, v.y, v.z, 1.0f);
 }
 
+[[nodiscard]] constexpr auto translation(float x, float y, float z) noexcept {
+    return translation(make_float3(x, y, z));
+}
+
 [[nodiscard]] inline auto rotation(const float3 axis, float angle) noexcept {
     if (angle == 0.0f) { return make_float4x4(1.0f); }
     auto c = cos(angle);
@@ -482,12 +486,20 @@ template<size_t N>
         0.0f, 0.0f, 0.0f, 1.0f);
 }
 
+[[nodiscard]] inline auto rotation(float ax, float ay, float az, float angle) noexcept {
+    return rotation(make_float3(ax, ay, az), angle);
+}
+
 [[nodiscard]] constexpr auto scaling(const float3 s) noexcept {
     return make_float4x4(
         s.x, 0.0f, 0.0f, 0.0f,
         0.0f, s.y, 0.0f, 0.0f,
         0.0f, 0.0f, s.z, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f);
+}
+
+[[nodiscard]] constexpr auto scaling(float x, float y, float z) noexcept {
+    return scaling(make_float3(x, y, z));
 }
 
 [[nodiscard]] constexpr auto scaling(float s) noexcept {

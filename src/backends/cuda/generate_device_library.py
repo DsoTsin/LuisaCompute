@@ -61,7 +61,7 @@ static_assert(sizeof(lc_half) == 2);
 [[nodiscard]] inline lc_half hceil(lc_half x) noexcept { return lc_half{ceilf(lc_float(x))}; }
 [[nodiscard]] inline lc_half hfloor(lc_half x) noexcept { return lc_half{floorf(lc_float(x))}; }
 [[nodiscard]] inline lc_half htrunc(lc_half x) noexcept { return lc_half{truncf(lc_float(x))}; }
-[[nodiscard]] inline lc_half hround(lc_half x) noexcept { return lc_half{roundf(lc_float(x))}; }
+[[nodiscard]] inline lc_half hround(lc_half x) noexcept { return lc_half{rintf(lc_float(x))}; }
 [[nodiscard]] inline lc_half hsqrt(lc_half x) noexcept { return lc_half{sqrtf(lc_float(x))}; }
 [[nodiscard]] inline lc_half hrsqrt(lc_half x) noexcept { return lc_half{rsqrtf(lc_float(x))}; }
 [[nodiscard]] inline lc_half __hfma(lc_half x, lc_half y, lc_half z) noexcept { return lc_half{fmaf(lc_float(x), lc_float(y), lc_float(z))}; }
@@ -424,7 +424,7 @@ struct lc_float{i}x{i} {{
         generate_vector_call("trunc", "truncf", "f", ["x"])
         generate_vector_call("trunc", "htrunc", "h", ["x"])
 
-        generate_vector_call("round", "roundf", "hf", ["x"])
+        generate_vector_call("round", "rintf", "hf", ["x"])
 
         generate_vector_call("fma", "fmaf", "f", ["x", "y", "z"])
         generate_vector_call("fma", "__hfma", "h", ["x", "y", "z"])

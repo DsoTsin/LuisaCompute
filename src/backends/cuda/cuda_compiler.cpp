@@ -38,15 +38,9 @@ namespace luisa::compute::cuda {
     for (auto o : options) { argv.emplace_back(o); }
     argv.emplace_back(nullptr);
 
-    char temp_file_name[L_tmpnam];
-    if (tmpnam(temp_file_name) == nullptr) {
-        LUISA_ERROR_WITH_LOCATION(
-            "Failed to get temp file name for CUDA compiler.");
-    }
-    auto temp_file = fopen(temp_file_name, "wb+");
+    auto temp_file = tmpfile();
     LUISA_ASSERT(temp_file != nullptr,
-                 "Failed to create temp file '{}' for CUDA compiler.",
-                 temp_file_name);
+                 "Failed to create temp file for CUDA compiler.");
 
     // setup the options
     reproc::options o;
@@ -78,7 +72,7 @@ namespace luisa::compute::cuda {
     write(src_filename);
     write(src);
     using namespace std::chrono_literals;
-    if (auto [exit_code, error] = p.wait(1024h/* almost forever */); exit_code || error) {
+    if (auto [exit_code, error] = p.wait(1024h /* almost forever */); exit_code || error) {
         LUISA_WARNING_WITH_LOCATION(
             "Failed to terminate the process: {} (exit code = {}).",
             error.message(), exit_code);
@@ -99,14 +93,7 @@ namespace luisa::compute::cuda {
             "The CUDA kernel might be incomplete.");
     }
     if (fclose(temp_file) != 0) {
-        LUISA_WARNING_WITH_LOCATION(
-            "Failed to close temp file '{}'.",
-            temp_file_name);
-    }
-    if (std::error_code ec; !std::filesystem::remove(temp_file_name, ec)) {
-        LUISA_WARNING_WITH_LOCATION(
-            "Failed to remove temp file '{}': {}.",
-            temp_file_name, ec.message());
+        LUISA_WARNING_WITH_LOCATION("Failed to close temp file.");
     }
     return buffer;
 }

@@ -47,9 +47,18 @@ namespace detail {
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
         (LPTSTR)&buffer,
         0, nullptr);
+#if UNICODE == 1
+    auto value = static_cast<wchar_t *>(buffer);
+    luisa::wstring_view err_msg_view{value};
+    luisa::string err_msg{reinterpret_cast<char const *>(err_msg_view.data()), err_msg_view.size() * sizeof(wchar_t)};
+    LocalFree(buffer);
+    return err_msg;
+#else
+    auto value = static_cast<wchar_t *>(buffer);
     luisa::string err_msg{fmt::format("{} (code = 0x{:x}).", static_cast<char *>(buffer), err_code)};
     LocalFree(buffer);
     return err_msg;
+#endif
 }
 
 }// namespace detail
@@ -97,13 +106,11 @@ void dynamic_module_destroy(void *handle) noexcept {
     if (handle != nullptr) { FreeLibrary(reinterpret_cast<HMODULE>(handle)); }
 }
 
-void *dynamic_module_find_symbol(void *handle, luisa::string_view name_view) noexcept {
-    static thread_local luisa::string name;
-    name = name_view;
-    auto symbol = GetProcAddress(reinterpret_cast<HMODULE>(handle), name.c_str());
+void *dynamic_module_find_symbol(void *handle, const char *name) noexcept {
+    auto symbol = GetProcAddress(reinterpret_cast<HMODULE>(handle), name);
     if (symbol == nullptr) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION("Failed to load symbol '{}', reason: {}.",
-                                  name, detail::win32_last_error_message());
+        LUISA_WARNING("Failed to load symbol '{}', reason: {}.",
+                      name, detail::win32_last_error_message());
     }
     return reinterpret_cast<void *>(symbol);
 }
@@ -198,7 +205,9 @@ luisa::string current_executable_path() noexcept {
 
 #ifdef LUISA_ARCH_ARM64
 #include <sys/types.h>
+#ifdef LUISA_PLATFORM_APPLE
 #include <sys/sysctl.h>
+#endif
 #else
 #include <cpuid.h>
 #endif
@@ -217,7 +226,7 @@ void *dynamic_module_load(const luisa::filesystem::path &path) noexcept {
     auto p = path;
     for (auto ext :
 #ifdef LUISA_PLATFORM_APPLE
-         { ".so", ".dylib" }
+         {".so", ".dylib"}
 #else
          {".so"}
 #endif
@@ -230,6 +239,7 @@ void *dynamic_module_load(const luisa::filesystem::path &path) noexcept {
             "Failed to load dynamic module '{}', reason: {}.",
             luisa::to_string(p), dlerror());
     }
+
     return nullptr;
 }
 
@@ -237,14 +247,12 @@ void dynamic_module_destroy(void *handle) noexcept {
     if (handle != nullptr) { dlclose(handle); }
 }
 
-void *dynamic_module_find_symbol(void *handle, luisa::string_view name_view) noexcept {
-    static thread_local luisa::string name;
-    name = name_view;
+void *dynamic_module_find_symbol(void *handle, const char *name) noexcept {
     Clock clock;
-    auto symbol = dlsym(handle, name.c_str());
+    auto symbol = dlsym(handle, name);
     if (symbol == nullptr) [[unlikely]] {
-        LUISA_ERROR_WITH_LOCATION("Failed to load symbol '{}', reason: {}.",
-                                  name, dlerror());
+        LUISA_WARNING("Failed to load symbol '{}', reason: {}.",
+                      name, dlerror());
     }
     LUISA_VERBOSE_WITH_LOCATION(
         "Loading dynamic symbol '{}' in {} ms.",
@@ -327,6 +335,7 @@ luisa::vector<TraceItem> backtrace() noexcept {
 
 #ifdef LUISA_ARCH_ARM64
 luisa::string cpu_name() noexcept {
+#ifdef LUISA_PLATFORM_APPLE
     constexpr auto buffer_size = static_cast<size_t>(256u);
     char brand[buffer_size];
     auto size = buffer_size;
@@ -334,6 +343,9 @@ luisa::string cpu_name() noexcept {
         return "Unknown ARM64";
     }
     return brand;
+#else
+    return "Unknown ARM64";// TODO: implement this
+#endif
 }
 #else
 luisa::string cpu_name() noexcept {
@@ -380,8 +392,6 @@ luisa::string current_executable_path() noexcept {
 namespace luisa {
 luisa::string to_string(const TraceItem &item) noexcept {
     using namespace std::string_view_literals;
-    return luisa::format(
-        FMT_STRING("[0x{:012x}]: {} :: {} + {}"sv),
-        item.address, item.module, item.symbol, item.offset);
+    return luisa::format("{}", item);
 }
 }// namespace luisa

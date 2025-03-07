@@ -11,7 +11,7 @@ ray.TMin=rayDesc.v1;
 ray.TMax=rayDesc.v3;
 RayQuery<_CLOSEST_HIT_RAY_FLAG> q;
 q.TraceRayInline(accel,_CLOSEST_HIT_RAY_FLAG,mask,ray);
-_Hit1 pl;
+_Hit1 pl=(_Hit1)0;
 q.Proceed();
 if(q.CommittedStatus()==COMMITTED_TRIANGLE_HIT){
 pl.v0=q.CommittedInstanceIndex();
@@ -62,7 +62,7 @@ return ray;
 }
 template<typename Q>
 _Hit0 _GetCommitedHit(Q q){
-_Hit0 pl;
+_Hit0 pl=(_Hit0)0;
 switch(q.CommittedStatus()){
 case COMMITTED_TRIANGLE_HIT:
 pl.v0=q.CommittedInstanceIndex();
@@ -86,7 +86,7 @@ return pl;
 }
 template<typename Q>
 _Hit1 _GetTriangleCandidateHit(Q q){
-_Hit1 pl;
+_Hit1 pl=(_Hit1)0;
 pl.v0=q.CandidateInstanceIndex();
 pl.v1=q.CandidatePrimitiveIndex();
 pl.v2=q.CandidateTriangleBarycentrics();
@@ -95,7 +95,7 @@ return pl;
 }
 template<typename Q>
 _Hit2 _GetProceduralCandidateHit(Q q){
-_Hit2 pl;
+_Hit2 pl=(_Hit2)0;
 pl.v0=q.CandidateInstanceIndex();
 pl.v1=q.CandidatePrimitiveIndex();
 return pl;

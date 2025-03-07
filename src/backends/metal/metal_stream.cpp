@@ -107,7 +107,7 @@ void MetalStream::submit(MTL::CommandBuffer *command_buffer,
             _callback_lists.emplace(std::move(callbacks));
         }
         command_buffer->addCompletedHandler(^(MTL::CommandBuffer *) noexcept {
-            auto callbakcs = [self = this] {
+            auto callbacks = [self = this] {
                 std::scoped_lock lock{self->_callback_mutex};
                 if (self->_callback_lists.empty()) {
                     LUISA_WARNING_WITH_LOCATION(
@@ -118,7 +118,7 @@ void MetalStream::submit(MTL::CommandBuffer *command_buffer,
                 self->_callback_lists.pop();
                 return callbacks;
             }();
-            for (auto callback : callbakcs) { callback->recycle(); }
+            for (auto callback : callbacks) { callback->recycle(); }
         });
     }
 #ifndef NDEBUG

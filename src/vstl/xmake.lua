@@ -1,15 +1,22 @@
 target("lc-vstl")
-_config_project({
-    project_kind = "static",
-    no_rtti = true,
-    batch_size = 4
-})
+if is_plat("macosx") then
+    _config_project({
+        project_kind = "shared",
+        batch_size = 4
+    })
+else
+    _config_project({
+        project_kind = "static",
+        no_rtti = true,
+        batch_size = 4
+    })
+    add_defines("LUISA_VSTL_STATIC_LIB", {
+        public = true
+    })
+end
 add_deps("lc-core", "lmdb")
 set_pcxxheader("pch.h")
 add_headerfiles("../../include/luisa/vstl/**.h")
-add_defines("LUISA_VSTL_STATIC_LIB", {
-    public = true
-})
 add_files("**.cpp")
 if is_plat("windows") then
     add_syslinks("Ole32", {

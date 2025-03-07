@@ -18,32 +18,24 @@ namespace detail {
 /// Enable subscript access
 template<typename T>
 struct RefEnableSubscriptAccess {
-
-public:
-    /// Access index
-    template<typename I>
-        requires is_integral_expr_v<I>
-    [[nodiscard]] auto operator[](I &&index) const & noexcept {
-        auto self = def<T>(static_cast<const T *>(this)->expression());
-        using Elem = std::remove_cvref_t<
-            decltype(std::declval<expr_value_t<T>>()[0])>;
-        return def<Elem>(FunctionBuilder::current()->access(
-            Type::of<Elem>(), self.expression(),
-            extract_expression(std::forward<I>(index))));
-    }
     /// Access index
     template<typename I>
         requires is_integral_expr_v<I>
     [[nodiscard]] auto &operator[](I &&index) & noexcept {
-        auto i = def(std::forward<I>(index));
         using Elem = std::remove_cvref_t<
             decltype(std::declval<expr_value_t<T>>()[0])>;
         auto f = FunctionBuilder::current();
         auto expr = f->access(
             Type::of<Elem>(),
             static_cast<const T *>(this)->expression(),
-            i.expression());
+            extract_expression(std::forward<I>(index)));
         return *f->create_temporary<Var<Elem>>(expr);
+    }
+    /// Access index
+    template<typename I>
+        requires is_integral_expr_v<I>
+    [[nodiscard]] const auto &operator[](I &&index) const & noexcept {
+        return (*const_cast<RefEnableSubscriptAccess *>(this))[std::forward<I>(index)];
     }
 };
 
@@ -52,10 +44,10 @@ template<typename T>
 struct RefEnableGetMemberByIndex {
     /// Get member by index
     template<size_t i>
-    [[nodiscard]] auto get() const noexcept {
+    [[nodiscard]] const auto &get() const noexcept {
         static_assert(i < dimension_v<expr_value_t<T>>);
         auto self = const_cast<T *>(static_cast<const T *>(this));
-        return Ref{self->operator[](static_cast<uint>(i))};
+        return (*self)[static_cast<uint>(i)];
     }
 };
 
@@ -74,6 +66,8 @@ public:                                                                    \
     explicit Ref(const Expression *e) noexcept : _expression{e} {}         \
     [[nodiscard]] auto expression() const noexcept { return _expression; } \
     Ref(Ref &&) noexcept = default;                                        \
+    Ref(Var<__VA_ARGS__> &&other) noexcept                                 \
+        : Ref{static_cast<Ref &&>(other)} {}                               \
     Ref(const Ref &) noexcept = default;                                   \
     template<typename Rhs>                                                 \
     void operator=(Rhs &&rhs) & noexcept {                                 \
@@ -93,7 +87,7 @@ struct Ref
     static_assert(concepts::scalar<T>);
     LUISA_REF_COMMON(T)
     template<size_t i>
-    [[nodiscard]] auto get() const noexcept {
+    [[nodiscard]] const auto &get() const noexcept {
         static_assert(i == 0u);
         return *this;
     }
@@ -134,10 +128,11 @@ template<typename... T>
 struct Ref<std::tuple<T...>> {
     LUISA_REF_COMMON(std::tuple<T...>)
     template<size_t i>
-    [[nodiscard]] auto get() const noexcept {
+    [[nodiscard]] const auto &get() const noexcept {
         using M = std::tuple_element_t<i, std::tuple<T...>>;
-        return Ref<M>{detail::FunctionBuilder::current()->member(
-            Type::of<M>(), this->expression(), i)};
+        auto fb = detail::FunctionBuilder::current();
+        auto expr = fb->member(Type::of<M>(), this->expression(), i);
+        return *fb->create_temporary<Var<M>>(expr);
     }
 };
 

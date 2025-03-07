@@ -6,8 +6,8 @@ namespace luisa::compute {
 
 enum class HitType : uint32_t {
     Miss = 0,
-    Surface = 1,// triangle or curve
-    Procedural = 2,   // bounding box (for procedural primitives)
+    Surface = 1,   // triangle or curve
+    Procedural = 2,// bounding box (for procedural primitives)
 
     // legacy names
     Triangle = Surface,
@@ -15,7 +15,7 @@ enum class HitType : uint32_t {
 
 // Hit classes used by DSL, DSL module see src/dsl/rtx/ray_query.h
 // Return type of RayQuery::committed_hit(), it represents a hit that can be a triangle, a procedural-primitive or nothing
-struct CommittedHit {
+struct alignas(8) CommittedHit {
     uint inst;
     uint prim;
     float2 bary;
@@ -27,7 +27,7 @@ static_assert(alignof(CommittedHit) == 8u, "CommittedHit align mismatch");
 
 // Return type of Accel::trace_closest() and RayQuery::triangle_candidate(), it represents a hit that can be a triangle or curve
 // if bary.v < 0.f then it's a curve hit, otherwise it's a triangle hit
-struct SurfaceHit {
+struct alignas(8) SurfaceHit {
     uint inst;
     uint prim;
     float2 bary;
@@ -37,10 +37,12 @@ static_assert(sizeof(SurfaceHit) == 24u, "SurfaceHit size mismatch");
 static_assert(alignof(SurfaceHit) == 8u, "SurfaceHit align mismatch");
 
 // Return type of RayQuery::procedural_candidate(), it represents a bounding-box hit of procedural-primitive
-struct AABBHit {
+struct alignas(8) AABBHit {
     uint inst;
     uint prim;
 };
+static_assert(sizeof(AABBHit) == 8u, "AABBHit size mismatch");
+static_assert(alignof(AABBHit) == 8u, "AABBHit align mismatch");
 
 // legacy names, provided for compatibility
 using TriangleHit = SurfaceHit;

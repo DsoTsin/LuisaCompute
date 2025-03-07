@@ -9,7 +9,7 @@ namespace luisa {
 
 /**
  * @brief Dynamic module loader
- * 
+ *
  */
 class LC_CORE_API DynamicModule : concepts::Noncopyable {
 
@@ -27,32 +27,32 @@ public:
     DynamicModule &operator=(DynamicModule &&rhs) noexcept;
     ~DynamicModule() noexcept;
     void dispose() noexcept;
+
+    /**
+     * @brief Return address of given name
+     *
+     * @param name
+     * @return void*
+     */
+    [[nodiscard]] void *address(const char *name) const noexcept {
+        return dynamic_module_find_symbol(_handle, name);
+    }
+
     /**
      * @brief Return function pointer of given name
-     * 
+     *
      * @tparam F function type
      * @param name name of function
      * @return pointer to function
      */
     template<concepts::function F>
-    [[nodiscard]] auto function(std::string_view name) const noexcept {
-        return reinterpret_cast<std::add_pointer_t<F>>(
-            dynamic_module_find_symbol(_handle, name));
-    }
-
-    /**
-     * @brief Return address of given name
-     * 
-     * @param name
-     * @return void* 
-     */
-    [[nodiscard]] void *address(std::string_view name) const noexcept {
-        return dynamic_module_find_symbol(_handle, name);
+    [[nodiscard]] auto function(const char *name) const noexcept {
+        return reinterpret_cast<std::add_pointer_t<F>>(address(name));
     }
 
     /**
      * @brief Invoke function
-     * 
+     *
      * @tparam F function type
      * @tparam Args function args
      * @param name name of function
@@ -61,35 +61,35 @@ public:
      */
     template<concepts::function F, typename... Args>
         requires(std::is_invocable_v<F, Args && ...>)
-    decltype(auto) invoke(std::string_view name, Args &&...args) const noexcept {
+    decltype(auto) invoke(const char *name, Args &&...args) const noexcept {
         return luisa::invoke(function<F>(name), std::forward<Args>(args)...);
     }
 
     /**
      * @brief Apply function to each element
-     * 
+     *
      * @tparam F function type
      * @tparam Tuple tuple type
      * @param name name of function
      * @param t tuple to be applied
-     * @return decltype(auto) 
+     * @return decltype(auto)
      */
     template<concepts::function F, typename Tuple>
-    decltype(auto) apply(std::string_view name, Tuple &&t) const noexcept {
+    decltype(auto) apply(const char *name, Tuple &&t) const noexcept {
         return std::apply(function<F>(name), std::forward<Tuple>(t));
     }
 
     /**
      * @brief Add dynamic module search path
-     * 
-     * @param path 
+     *
+     * @param path
      */
     static void add_search_path(const std::filesystem::path &path) noexcept;
 
     /**
      * @brief Remove dynamic module search path
-     * 
-     * @param path 
+     *
+     * @param path
      */
     static void remove_search_path(const std::filesystem::path &path) noexcept;
 
@@ -98,8 +98,7 @@ public:
      * @param name Name of the module
      * @return The module if successfully loaded, otherwise a nullopt
      */
-    [[nodiscard]] static DynamicModule load(
-        std::string_view name) noexcept;
+    [[nodiscard]] static DynamicModule load(std::string_view name) noexcept;
 
     /**
      * @brief Load module with the specified name in a folder
@@ -107,8 +106,8 @@ public:
      * @param name Name of the module
      * @return The module if successfully loaded, otherwise a nullopt
      */
-    [[nodiscard]] static DynamicModule load(
-        const std::filesystem::path &folder, std::string_view name) noexcept;
+    [[nodiscard]] static DynamicModule load(const luisa::filesystem::path &folder,
+                                            std::string_view name) noexcept;
 };
 
 }// namespace luisa
