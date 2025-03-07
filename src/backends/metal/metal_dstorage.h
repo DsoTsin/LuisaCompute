@@ -2,7 +2,9 @@
 
 #include <luisa/core/stl/unordered_map.h>
 #include <luisa/backends/ext/dstorage_ext_interface.h>
+
 #include "metal_api.h"
+#include "metal_stream.h"
 
 namespace luisa::compute::metal {
 
@@ -15,9 +17,7 @@ private:
     MTL::Buffer *_device_buffer;
 
 public:
-    MetalPinnedMemory(MTL::Device *device,
-                      void *host_ptr,
-                      size_t size_bytes) noexcept;
+    MetalPinnedMemory(MTL::Device *device, void *host_ptr, size_t size_bytes, bool write_combined) noexcept;
     ~MetalPinnedMemory() noexcept;
     // disable copy and move
     MetalPinnedMemory(MetalPinnedMemory &&) noexcept = delete;
@@ -110,4 +110,3 @@ public:
 };
 
 }// namespace luisa::compute::metal
-

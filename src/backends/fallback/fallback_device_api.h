@@ -174,14 +174,15 @@ struct alignas(16) EmbreeRayHit;
 
 struct alignas(16) AccelInstance {
     float affine[12];
-    uint mask : 1;
-    uint opaque : 1;
-    uint dirty : 1;
-    uint is_curve : 1;
-    uint is_motion : 1;
-    uint is_srt : 1;
-    uint is_matrix : 1;
-    uint motion_steps : 8;
+    uint8_t mask;
+    uint8_t opaque : 1;
+    uint8_t dirty : 1;
+    uint8_t is_curve : 1;
+    uint8_t is_motion : 1;
+    uint8_t is_srt : 1;
+    uint8_t is_matrix : 1;
+    uint8_t padding : 2;
+    uint8_t motion_steps;
     uint user_id;
     MotionInstanceTransform *motion;
 };

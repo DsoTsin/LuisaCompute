@@ -232,9 +232,8 @@ uint MetalDevice::compute_warp_size() const noexcept {
     auto buffer_size = element_stride * element_count;
     auto buffer = [&] {
         if (external_memory) {
-            auto mtl_buffer = reinterpret_cast<MTL::Buffer *>(external_memory);
-            LUISA_ASSERT(mtl_buffer->length() >= buffer_size,
-                         "External memory is not large enough.");
+            auto mtl_buffer = static_cast<MTL::Buffer *>(external_memory);
+            LUISA_ASSERT(mtl_buffer->length() >= buffer_size, "External memory is not large enough.");
             return new_with_allocator<MetalBuffer>(mtl_buffer);
         }
         return new_with_allocator<MetalBuffer>(device, buffer_size);

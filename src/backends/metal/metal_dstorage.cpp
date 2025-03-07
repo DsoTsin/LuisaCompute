@@ -150,11 +150,8 @@ void MetalDStorageExt::compress(const void *data, size_t size_bytes,
                   size_bytes, result.size_bytes(), ratio, to_string(algorithm), clk.toc());
 }
 
-MetalPinnedMemory::MetalPinnedMemory(MTL::Device *device,
-                                     void *host_ptr,
-                                     size_t size_bytes) noexcept
-    : _host_ptr{host_ptr}, _size_bytes{size_bytes},
-      _offset{0u}, _device_buffer{nullptr} {
+MetalPinnedMemory::MetalPinnedMemory(MTL::Device *device, void *host_ptr, size_t size_bytes, bool write_combined) noexcept
+    : _host_ptr{host_ptr}, _size_bytes{size_bytes}, _offset{0u}, _device_buffer{nullptr} {
     Clock clk;
     auto page_size = pagesize();
     auto host_addr = reinterpret_cast<size_t>(host_ptr);
@@ -166,12 +163,10 @@ MetalPinnedMemory::MetalPinnedMemory(MTL::Device *device,
             "Failed to lock host memory: {}",
             std::strerror(errno));
     } else {
+        auto options = MTL::ResourceHazardTrackingModeTracked | MTL::ResourceStorageModeShared;
+        if (write_combined) { options |= MTL::ResourceCPUCacheModeWriteCombined; }
         _device_buffer = device->newBuffer(
-            reinterpret_cast<void *>(aligned_addr),
-            aligned_size,
-            MTL::ResourceOptionCPUCacheModeWriteCombined |
-                MTL::ResourceStorageModeShared |
-                MTL::ResourceHazardTrackingModeUntracked,
+            reinterpret_cast<void *>(aligned_addr), aligned_size, options,
             ^(void *ptr, NS::UInteger size) noexcept {
                 munlock(reinterpret_cast<void *>(aligned_addr), aligned_size);
                 LUISA_VERBOSE("Unpinned page-aligned memory "
@@ -580,7 +575,7 @@ DeviceInterface *MetalDStorageExt::device() const noexcept { return _device; }
 
 [[nodiscard]] DStorageExt::PinnedMemoryInfo MetalDStorageExt::pin_host_memory(void *ptr, size_t size_bytes) noexcept {
     return with_autorelease_pool([=, this] {
-        auto pinned = luisa::new_with_allocator<MetalPinnedMemory>(_device->handle(), ptr, size_bytes);
+        auto pinned = luisa::new_with_allocator<MetalPinnedMemory>(_device->handle(), ptr, size_bytes, true);
         if (!pinned->valid()) {
             luisa::delete_with_allocator(pinned);
             return PinnedMemoryInfo::make_invalid();
