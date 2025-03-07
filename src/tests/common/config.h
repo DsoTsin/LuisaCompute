@@ -30,7 +30,7 @@ namespace luisa::test {
             luisa::string device_name = luisa::test::backends_to_test()[i]; \
             SUBCASE(device_name.c_str()) {                                  \
                 Device device = context.create_device(device_name.c_str()); \
-                REQUIRE(condition);                                         \
+                CHECK(condition);                                         \
             }                                                               \
         }                                                                   \
     }
