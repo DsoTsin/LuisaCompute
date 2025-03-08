@@ -27,6 +27,15 @@ LUISA_STRUCT(luisa::test::SampleSOA, a, b) {};
 
 namespace luisa::test {
 
+
+template<typename T>
+BufferView<T> get_soa_view(SOAView<T>& view) {
+    return view.buffer().subview(
+        view.soa_offset() + view.element_offset() * view.element_stride,
+        view.element_size()
+    ).as<T>();
+}
+
 template<int N>
 bool test_soa_element(Device& device) {
     // Element-wise SOA test
@@ -47,20 +56,10 @@ bool test_soa_element(Device& device) {
     // initialize with element
     auto stream = device.create_stream();
     auto soa_view = soa.view();
-
-    LUISA_INFO("soa.a.element_offset() = {}", soa.a.element_offset());
-    LUISA_INFO("soa.a.element_size() = {}", soa.a.element_size());
-    LUISA_INFO("soa.a.soa_offset() = {}", soa.a.soa_offset());
-    LUISA_INFO("soa.b.element_offset() = {}", soa.b.element_offset());
-
-    stream << soa_view.a.buffer().subview(
-        soa.a.soa_offset() + (soa.a.element_offset() + 0u) * soa.a.element_stride,
-        soa.a.element_size()
-    ).as<int>().copy_from(host_a.data())
-           << soa_view.b.buffer().subview(
-            soa.b.soa_offset() + (soa.b.element_offset() + 0u) * soa.b.element_stride,
-            soa.b.element_size()
-           ).as<float>().copy_from(host_b.data())
+    auto a_view = get_soa_view(soa_view.a);
+    auto b_view = get_soa_view(soa_view.b);
+    stream << a_view.copy_from(host_a.data())
+           << b_view.copy_from(host_b.data())
            << synchronize();
 
     // read back
@@ -69,14 +68,8 @@ bool test_soa_element(Device& device) {
 
 
 
-    stream << soa_view.a.buffer().subview(
-        soa.a.soa_offset() + (soa.a.element_offset() + 0u) * soa.a.element_stride,
-        soa.a.element_size()
-    ).as<int>().copy_to(host_a_download.data())
-           << soa_view.b.buffer().subview(
-            soa.b.soa_offset() + (soa.b.element_offset() + 0u) * soa.b.element_stride,
-            soa.b.element_size()
-           ).as<float>().copy_to(host_b_download.data())
+    stream << a_view.copy_to(host_a_download.data())
+           << b_view.copy_to(host_b_download.data())
            << synchronize();
 
     for (auto i = 0u; i < N; i++) {
