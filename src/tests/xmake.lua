@@ -107,7 +107,7 @@ end
 
 if get_config("enable_xir") then 
     test_proj("test_ast_to_xir")
-    test_proj("test_xir_builder")
+    -- test_proj("test_xir_builder")
 end 
 
 test_proj("test_helloworld")

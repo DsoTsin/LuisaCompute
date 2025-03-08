@@ -129,7 +129,6 @@ set_showmenu(true)
 option_end()
 --------------------------------
 
-
 -- enable osl
 option("enable_osl")
 set_values(true, false)
@@ -193,7 +192,7 @@ set_default(false)
 set_showmenu(true)
 option_end()
 
-option("fallback_llvm_path") -- Currenct Require LLVM 19.1.7
+option("fallback_llvm_path") -- Currenct Require LLVM 19+
 set_default(false)
 set_showmenu(true)
 option_end()
