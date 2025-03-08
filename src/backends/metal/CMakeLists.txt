@@ -40,7 +40,8 @@ if (APPLE AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             metal_denoiser.cpp metal_denoiser.h
             metal_dstorage.cpp metal_dstorage.h
             metal_debug_capture.cpp metal_debug_capture.h
-            metal_pinned_memory.cpp metal_pinned_memory.h)
+            metal_pinned_memory.cpp metal_pinned_memory.h
+            metal_tex_compress.cpp metal_tex_compress.h)
 
     if (LUISA_COMPUTE_ENABLE_RUST)
         list(APPEND METAL_SOURCES metal_codegen_ir.cpp metal_codegen_ir.h)

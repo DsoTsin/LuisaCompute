@@ -1,6 +1,7 @@
 #pragma once
 #include <Resource/TextureBase.h>
 namespace lc::dx {
+class UpdateTileTracker;
 class SparseTexture final : public TextureBase {
 private:
     ComPtr<ID3D12Resource> resource;
@@ -34,7 +35,7 @@ public:
     uint GetGlobalSRVIndex(uint mipOffset = 0) const override;
     D3D12_SHADER_RESOURCE_VIEW_DESC GetColorSrvDesc(uint mipOffset = 0) const override;
     uint GetGlobalUAVIndex(uint mipLevel) const override;
-    void AllocateTile(ID3D12CommandQueue *queue, uint3 coord, uint3 size, uint mipLevel, uint64 alloc) const;
-    void DeAllocateTile(ID3D12CommandQueue *queue, uint3 coord, uint3 size, uint mipLevel) const;
+    void AllocateTile(uint3 coord, uint3 size, uint mipLevel, uint64 alloc, UpdateTileTracker* tile_tracker) const;
+    void DeAllocateTile(uint3 coord, uint3 size, uint mipLevel, UpdateTileTracker* tile_tracker) const;
 };
 }// namespace lc::dx

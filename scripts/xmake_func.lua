@@ -8,6 +8,27 @@ set_showmenu(false)
 set_default(false)
 option_end()
 
+option("_lc_vk_sdk_dir")
+set_default(false)
+set_showmenu(false)
+add_deps("vk_support")
+after_check(function(option)
+    if not option:dep("vk_support"):enabled() then
+        option:set_value(false)
+        return
+    end
+    local sdk_dir = os.getenv("VK_SDK_PATH")
+    if not sdk_dir then
+        sdk_dir = os.getenv("VULKAN_SDK")
+    end
+    if not sdk_dir then
+        option:set_value(false)
+    else
+        option:set_value(sdk_dir)
+    end
+end)
+option_end()
+
 option("_lc_check_env")
 set_showmenu(false)
 set_default(false)
@@ -29,10 +50,10 @@ option_end()
 option("_lc_bin_dir")
 set_default(false)
 set_showmenu(false)
-add_deps("enable_mimalloc", "enable_unity_build", "enable_simd", "dx_backend", "vk_backend", "cuda_backend",
-    "metal_backend", "cpu_backend", "enable_tests", "enable_custom_malloc", "enable_clangcxx", "py_include",
-    "py_linkdir", "external_marl", "py_libs", "cuda_ext_lcub", "enable_ir", "enable_osl", "enable_api", "enable_dsl",
-    "enable_gui", "bin_dir", "sdk_dir", "_lc_enable_py", "_lc_enable_rust")
+add_deps("dx_backend", "vk_backend", "cuda_backend",
+    "metal_backend", "cpu_backend", "enable_tests", "py_include",
+    "cuda_ext_lcub", "enable_ir", "enable_dsl",
+    "enable_gui", "bin_dir", "_lc_enable_py", "_lc_enable_rust")
 before_check(function(option)
     if path.absolute(path.join(os.projectdir(), "scripts")) == path.absolute(os.scriptdir()) then
         local v = import("options", {
@@ -389,17 +410,20 @@ rule_end()
 
 rule('lc_install_sdk')
 on_load(function(target)
+    local custom_sdk_dir = get_config("sdk_dir")
+    if type(custom_sdk_dir ) == "string" and not os.exists(custom_sdk_dir) then
+        return
+    end
     local packages = import('packages')
     local libnames = target:extraconf("rules", "lc_install_sdk", "libnames")
     local find_sdk = import('find_sdk')
     local enable = true
-    local sdk_dir = get_config("sdk_dir")
     for _, lib in ipairs(libnames) do
-        local valid = find_sdk.check_file(lib, sdk_dir)
+        local valid = find_sdk.check_file(lib, custom_sdk_dir)
         if not valid then
             utils.error("Library: " .. packages.sdks()[lib]['name'] ..
                             " not installed, run 'xmake lua setup.lua' or download it manually from " ..
-                            packages.sdk_address(packages.sdks()[lib]) .. ' to ' .. packages.sdk_dir(os.arch(), sdk_dir) ..
+                            packages.sdk_address(packages.sdks()[lib]) .. ' to ' .. packages.sdk_dir(os.arch(), custom_sdk_dir) ..
                             '.')
             enable = false
         end
@@ -409,6 +433,10 @@ on_load(function(target)
     end
 end)
 on_clean(function(target)
+    local custom_sdk_dir = get_config("sdk_dir")
+    if type(custom_sdk_dir ) == "string" and not os.exists(custom_sdk_dir) then
+        return
+    end
     local bin_dir = target:targetdir()
     local find_sdk = import('find_sdk')
     local packages = import('packages')
@@ -423,6 +451,10 @@ on_clean(function(target)
     end
 end)
 before_build(function(target)
+    local custom_sdk_dir = get_config("sdk_dir")
+    if type(custom_sdk_dir ) == "string" and not os.exists(custom_sdk_dir) then
+        return
+    end
     local bin_dir = target:targetdir()
     local lib = import('lib')
     lib.mkdirs(bin_dir)
@@ -430,7 +462,7 @@ before_build(function(target)
     local packages = import('packages')
     local find_sdk = import('find_sdk')
     local sdks = packages.sdks()
-    local sdk_dir = packages.sdk_dir(os.arch(), get_config("sdk_dir"))
+    local sdk_dir = packages.sdk_dir(os.arch(), custom_sdk_dir)
     for _, lib in ipairs(libnames) do
         local sdk_map = sdks[lib]
         local zip = sdk_map['name']

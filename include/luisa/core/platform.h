@@ -19,7 +19,7 @@ LC_CORE_API void aligned_free(void *p) noexcept;
 [[nodiscard]] LC_CORE_API luisa::string_view dynamic_module_extension() noexcept;
 [[nodiscard]] LC_CORE_API void *dynamic_module_load(const luisa::filesystem::path &path) noexcept;
 LC_CORE_API void dynamic_module_destroy(void *handle) noexcept;
-[[nodiscard]] LC_CORE_API void *dynamic_module_find_symbol(void *handle, luisa::string_view name) noexcept;
+[[nodiscard]] LC_CORE_API void *dynamic_module_find_symbol(void *handle, const char *name) noexcept;
 [[nodiscard]] LC_CORE_API luisa::string dynamic_module_name(luisa::string_view name) noexcept;
 // [[nodiscard]] LC_CORE_API luisa::string demangle(const char *name) noexcept;
 

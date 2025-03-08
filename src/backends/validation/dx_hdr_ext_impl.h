@@ -26,7 +26,7 @@ public:
     }
     void set_color_space(
         uint64_t handle,
-        ColorSpace const &color_space) const noexcept {
+        ColorSpace const &color_space) const noexcept override {
         ptr->set_color_space(handle, color_space);
     }
     DisplayData get_display_data(uint64_t hwnd) const noexcept override {

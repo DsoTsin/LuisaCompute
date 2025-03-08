@@ -33,9 +33,9 @@ void CUDAMesh::build(CUDACommandEncoder &encoder, MeshBuildCommand *command) noe
     auto vertex_buffer = reinterpret_cast<const CUDABuffer *>(command->vertex_buffer());
     auto triangle_buffer = reinterpret_cast<const CUDABuffer *>(command->triangle_buffer());
     LUISA_ASSERT(command->vertex_buffer_offset() + command->vertex_buffer_size() <= vertex_buffer->size_bytes(),
-                 "Vertex buffer offset + size exceeds buffer size {}.");
+                 "Vertex buffer offset + size exceeds buffer size {}.", vertex_buffer->size_bytes());
     LUISA_ASSERT(command->triangle_buffer_offset() + command->triangle_buffer_size() <= triangle_buffer->size_bytes(),
-                 "Triangle buffer offset + size exceeds buffer size {}.");
+                 "Triangle buffer offset + size exceeds buffer size {}.", triangle_buffer->size_bytes());
 
     std::scoped_lock lock{_mutex};
 

@@ -1,6 +1,7 @@
 #pragma once
 #include <Resource/Buffer.h>
 namespace lc::dx {
+class UpdateTileTracker;
 class SparseBuffer final : public Buffer {
 private:
     ComPtr<ID3D12Resource> resource;
@@ -20,8 +21,8 @@ public:
     ID3D12Resource *GetResource() const override { return resource.Get(); }
     D3D12_GPU_VIRTUAL_ADDRESS GetAddress() const override { return resource->GetGPUVirtualAddress(); }
     uint64 GetByteSize() const override { return byteSize; }
-    void AllocateTile(ID3D12CommandQueue *queue, uint coord, uint size, uint64 alloc) const;
-    void DeAllocateTile(ID3D12CommandQueue *queue, uint coord, uint size) const;
+    void AllocateTile(uint coord, uint size, uint64 alloc, UpdateTileTracker* tile_tracker) const;
+    void DeAllocateTile(uint coord, uint size, UpdateTileTracker* tile_tracker) const;
     SparseBuffer(
         Device *device,
         uint64 byteSize,

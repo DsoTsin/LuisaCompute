@@ -1,27 +1,23 @@
 #include <luisa/core/logging.h>
 #include <luisa/xir/undefined.h>
+#include <luisa/xir/function.h>
 #include <luisa/xir/builder.h>
 
 #include "helpers.h"
 
-#include "luisa/xir/function.h"
-
 namespace luisa::compute::xir {
 
+Value *trace_pointer_base_value(Value *pointer) noexcept {
+    return pointer != nullptr && pointer->isa<GEPInst>() ?
+               trace_pointer_base_value(static_cast<GEPInst *>(pointer)->base()) :
+               pointer;
+}
+
 AllocaInst *trace_pointer_base_local_alloca_inst(Value *pointer) noexcept {
-    if (pointer == nullptr || !pointer->isa<Instruction>()) { return nullptr; }
-    switch (auto inst = static_cast<Instruction *>(pointer); inst->derived_instruction_tag()) {
-        case DerivedInstructionTag::ALLOCA: {
-            if (auto alloca_inst = static_cast<AllocaInst *>(inst); alloca_inst->space() == AllocSpace::LOCAL) {
-                return alloca_inst;
-            }
-            return nullptr;
-        }
-        case DerivedInstructionTag::GEP: {
-            auto gep_inst = static_cast<GEPInst *>(inst);
-            return trace_pointer_base_local_alloca_inst(gep_inst->base());
-        }
-        default: break;
+    if (auto base = trace_pointer_base_value(pointer);
+        base != nullptr && base->isa<AllocaInst>() &&
+        static_cast<AllocaInst *>(base)->space() == AllocSpace::LOCAL) {
+        return static_cast<AllocaInst *>(base);
     }
     return nullptr;
 }

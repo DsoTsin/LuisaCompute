@@ -25,13 +25,16 @@ if (LLVM_FOUND AND embree_FOUND)
             fallback_texture.cpp
             fallback_prim.cpp
             fallback_mesh.cpp
+            fallback_curve.cpp
             fallback_proc_prim.cpp
+            fallback_motion_instance.cpp
             fallback_accel.cpp
             fallback_texture_bc.cpp
             fallback_codegen.cpp
             fallback_shader.cpp
             fallback_buffer.cpp
             fallback_swapchain.cpp
+            fallback_tex_compress.cpp
     )
 
     luisa_compute_add_backend(fallback SOURCES ${LC_BACKEND_FALLBACK_SRC})
@@ -47,22 +50,26 @@ if (LLVM_FOUND AND embree_FOUND)
     target_compile_definitions(luisa-compute-backend-fallback PRIVATE
             LUISA_COMPUTE_FALLBACK_EMBREE_VERSION=${embree_VERSION_MAJOR})
 
-    # use libdispatch or TBB for parallel_for on non-Apple Unix systems if available
-    if (UNIX AND NOT APPLE)
-        # libdispatch
-        find_library(DISPATCH_LIB dispatch)
-        find_path(DISPATCH_INCLUDE_DIR dispatch/dispatch.h)
-        if (DISPATCH_LIB AND DISPATCH_INCLUDE_DIR)
-            target_compile_definitions(luisa-compute-backend-fallback PRIVATE LUISA_COMPUTE_ENABLE_LIBDISPATCH=1)
-            target_link_libraries(luisa-compute-backend-fallback PRIVATE ${DISPATCH_LIB})
-            target_include_directories(luisa-compute-backend-fallback PRIVATE ${DISPATCH_INCLUDE_DIR})
-        else ()
-            find_package(TBB CONFIG)
-            if (TBB_FOUND)
-                target_compile_definitions(luisa-compute-backend-fallback PRIVATE LUISA_COMPUTE_ENABLE_TBB=1)
-                target_link_libraries(luisa-compute-backend-fallback PRIVATE TBB::tbb)
+    option(LUISA_COMPUTE_ENABLE_SYSTEM_PARALLEL_FOR "Enable system parallel_for" OFF)
+    if (LUISA_COMPUTE_ENABLE_SYSTEM_PARALLEL_FOR)
+        target_compile_definitions(luisa-compute-backend-fallback PRIVATE LUISA_COMPUTE_ENABLE_SYSTEM_PARALLEL_FOR=1)
+        # use libdispatch or TBB for parallel_for on non-Apple Unix systems if available
+        if (UNIX AND NOT APPLE)
+            # libdispatch
+            find_library(DISPATCH_LIB dispatch)
+            find_path(DISPATCH_INCLUDE_DIR dispatch/dispatch.h)
+            if (DISPATCH_LIB AND DISPATCH_INCLUDE_DIR)
+                target_compile_definitions(luisa-compute-backend-fallback PRIVATE LUISA_COMPUTE_ENABLE_LIBDISPATCH=1)
+                target_link_libraries(luisa-compute-backend-fallback PRIVATE ${DISPATCH_LIB})
+                target_include_directories(luisa-compute-backend-fallback PRIVATE ${DISPATCH_INCLUDE_DIR})
             else ()
-                message(WARNING "TBB and libdispatch not found. Performance of the fallback backend may be affected.")
+                # find_package(TBB CONFIG)
+                if (TBB_FOUND)
+                    target_compile_definitions(luisa-compute-backend-fallback PRIVATE LUISA_COMPUTE_ENABLE_TBB=1)
+                    target_link_libraries(luisa-compute-backend-fallback PRIVATE TBB::tbb)
+                else ()
+                    message(WARNING "TBB and libdispatch not found. Performance of the fallback backend may be affected.")
+                endif ()
             endif ()
         endif ()
     endif ()
@@ -81,8 +88,13 @@ if (LLVM_FOUND AND embree_FOUND)
                 SOURCE_FROM_CONTENT "try_link_llvm.cpp" "int main() {}"
                 LINK_OPTIONS ${LLVM_LINK_DIR_OPTIONS}
                 LINK_LIBRARIES ${LLVM_LIBS})
-        if (LLVM_LIB_EXIST)
-            message(STATUS "Linking with LLVM libraries: ${LLVM_LIBS}")
+        if (LLVM_LIBS_EXIST)
+            # libzstd_shared might cause problem on Ubuntu
+            if (NOT TARGET zstd::libzstd_shared)
+                get_target_property(LLVM_SUPPORT_LINK_LIBS LLVMSupport INTERFACE_LINK_LIBRARIES)
+                list(FILTER LLVM_SUPPORT_LINK_LIBS EXCLUDE REGEX "(zstd::libzstd_shared)")
+                set_target_properties(LLVMSupport PROPERTIES INTERFACE_LINK_LIBRARIES "${LLVM_SUPPORT_LINK_LIBS}")
+            endif ()
         else ()
             message(WARNING "LLVM libraries not found. Trying to link with LLVM shared libraries.")
             try_compile(LLVM_DYLIB_EXISTS
@@ -97,19 +109,23 @@ if (LLVM_FOUND AND embree_FOUND)
                 set(LLVM_LIBS ${LLVM_DYLIB})
             endif ()
         endif ()
+    endif ()
+
+    message(STATUS "Linking with LLVM libraries: ${LLVM_LIBS}")
+    if (UNIX AND NOT APPLE)
         # avoid re-exporting symbols from LLVM
         target_link_libraries(luisa-compute-backend-fallback PRIVATE "-Wl,--exclude-libs,ALL" ${LLVM_LIBS})
     else ()
         target_link_libraries(luisa-compute-backend-fallback PRIVATE ${LLVM_LIBS})
     endif ()
 
-    if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-        target_compile_options(luisa-compute-backend-fallback PRIVATE
-                /wd4624 /wd4996 # do not complain about LLVM
-                /fp:fast /fp:contract /fp:except- /ARCH:AVX2)
-    else ()
-        target_compile_options(luisa-compute-backend-fallback PRIVATE -ffast-math)
-    endif ()
+    #    if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+    #        target_compile_options(luisa-compute-backend-fallback PRIVATE
+    #                /wd4624 /wd4996 # do not complain about LLVM
+    #                /fp:fast /fp:contract /fp:except- /ARCH:AVX2)
+    #    else ()
+    #        target_compile_options(luisa-compute-backend-fallback PRIVATE -ffast-math)
+    #    endif ()
 
 elseif (NOT LUISA_COMPUTE_CHECK_BACKEND_DEPENDENCIES)
     message(FATAL_ERROR "LLVM or Embree not found for the fallback backend.")

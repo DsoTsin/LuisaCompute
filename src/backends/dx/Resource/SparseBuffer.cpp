@@ -2,7 +2,7 @@
 #include <Resource/GpuAllocator.h>
 #include <luisa/core/logging.h>
 #include "SparseHeap.h"
-
+#include <DXRuntime/UpdateTileTracker.h>
 namespace lc::dx {
 SparseBuffer::SparseBuffer(
     Device *device,
@@ -32,7 +32,7 @@ vstd::optional<D3D12_UNORDERED_ACCESS_VIEW_DESC> SparseBuffer::GetColorUavDesc(u
 }
 SparseBuffer::~SparseBuffer() {
 }
-void SparseBuffer::DeAllocateTile(ID3D12CommandQueue *queue, uint coord, uint size) const {
+void SparseBuffer::DeAllocateTile(uint coord, uint size, UpdateTileTracker *tile_tracker) const {
     D3D12_TILED_RESOURCE_COORDINATE tileCoord{
         .X = coord,
         .Subresource = 0};
@@ -42,36 +42,19 @@ void SparseBuffer::DeAllocateTile(ID3D12CommandQueue *queue, uint coord, uint si
         .Width = static_cast<uint>(size),
         .Height = 1,
         .Depth = 1};
-    queue->UpdateTileMappings(
-        resource.Get(), 1,
-        &tileCoord,
-        &tileSize,
-        nullptr, 1,
-        vstd::get_rval_ptr(D3D12_TILE_RANGE_FLAG_NULL),
-        nullptr,
-        nullptr,
-        D3D12_TILE_MAPPING_FLAG_NONE);
+    tile_tracker->deallocate(resource.Get(), tileCoord, tileSize);
 }
-void SparseBuffer::AllocateTile(ID3D12CommandQueue *queue, uint coord, uint size, uint64 alloc) const {
+void SparseBuffer::AllocateTile(uint coord, uint size, uint64 alloc, UpdateTileTracker *tile_tracker) const {
     auto heap = reinterpret_cast<SparseHeap const *>(alloc);
     D3D12_TILED_RESOURCE_COORDINATE tileCoord{
         .X = coord,
         .Subresource = 0};
-    if (heap->size_bytes < size * D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES) [[unlikely]]{
+    if (heap->size_bytes < size * D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES) [[unlikely]] {
         LUISA_ERROR("Map size out of range. Required size: {}, heap size: {}", size * D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES, heap->size_bytes);
     }
     D3D12_TILE_REGION_SIZE tileSize{
         .NumTiles = size};
     uint tileOffset = heap->offset / D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES;
-    queue->UpdateTileMappings(
-        resource.Get(), 1,
-        &tileCoord,
-        &tileSize,
-        heap->heap,
-        1,
-        vstd::get_rval_ptr(D3D12_TILE_RANGE_FLAG_NONE),
-        &tileOffset,
-        &size,
-        D3D12_TILE_MAPPING_FLAG_NONE);
+    tile_tracker->record(heap->heap, resource.Get(), tileCoord, tileSize, D3D12_TILE_RANGE_FLAG_NONE, tileOffset, size);
 }
 }// namespace lc::dx

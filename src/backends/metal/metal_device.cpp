@@ -29,6 +29,7 @@
 #include "metal_dstorage.h"
 #include "metal_pinned_memory.h"
 #include "metal_debug_capture.h"
+#include "metal_tex_compress.h"
 
 #include <cstdlib>
 
@@ -231,9 +232,8 @@ uint MetalDevice::compute_warp_size() const noexcept {
     auto buffer_size = element_stride * element_count;
     auto buffer = [&] {
         if (external_memory) {
-            auto mtl_buffer = reinterpret_cast<MTL::Buffer *>(external_memory);
-            LUISA_ASSERT(mtl_buffer->length() >= buffer_size,
-                         "External memory is not large enough.");
+            auto mtl_buffer = static_cast<MTL::Buffer *>(external_memory);
+            LUISA_ASSERT(mtl_buffer->length() >= buffer_size, "External memory is not large enough.");
             return new_with_allocator<MetalBuffer>(mtl_buffer);
         }
         return new_with_allocator<MetalBuffer>(device, buffer_size);
@@ -686,6 +686,11 @@ DeviceExtension *MetalDevice::extension(luisa::string_view name) noexcept {
             std::scoped_lock lock{_ext_mutex};
             if (!_debug_capture_ext) { _debug_capture_ext = luisa::make_unique<MetalDebugCaptureExt>(this); }
             return _debug_capture_ext.get();
+        }
+        if (name == TexCompressExt::name) {
+            std::scoped_lock lock{_ext_mutex};
+            if (!_tex_compress_ext) { _tex_compress_ext = luisa::make_unique<MetalTexCompressExt>(this); }
+            return _tex_compress_ext.get();
         }
 #if LUISA_BACKEND_ENABLE_OIDN
         if (name == DenoiserExt::name) {

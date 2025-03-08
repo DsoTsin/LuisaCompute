@@ -39,12 +39,12 @@ set(SPDLOG_FMT_EXTERNAL_HO OFF CACHE BOOL "" FORCE)
 set(SPDLOG_DISABLE_DEFAULT_LOGGER ON CACHE BOOL "" FORCE)
 add_subdirectory(spdlog)
 target_compile_definitions(spdlog_header_only INTERFACE
-        FMT_CONSTEVAL=constexpr
+        FMT_USE_CONSTEVAL=0
         FMT_EXCEPTIONS=0
         FMT_HEADER_ONLY=1
         FMT_USE_NOEXCEPT=1)
 target_compile_definitions(spdlog PUBLIC
-        FMT_CONSTEVAL=constexpr
+        FMT_USE_CONSTEVAL=0
         FMT_EXCEPTIONS=0
         FMT_HEADER_ONLY=1
         FMT_USE_NOEXCEPT=1)
@@ -162,6 +162,9 @@ target_compile_definitions(luisa-compute-ext-yyjson-interface INTERFACE YYJSON_I
 add_library(luisa-compute-ext-yyjson OBJECT yyjson/src/yyjson.c yyjson/src/yyjson.h)
 target_link_libraries(luisa-compute-ext-yyjson PUBLIC luisa-compute-ext-yyjson-interface)
 target_compile_definitions(luisa-compute-ext-yyjson PRIVATE YYJSON_EXPORTS=1)
+if (UNIX AND NOT APPLE)
+    set_target_properties(luisa-compute-ext-yyjson PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif ()
 
 # marl
 add_library(luisa-compute-ext-marl-interface INTERFACE)

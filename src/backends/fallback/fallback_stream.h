@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <luisa/runtime/command_list.h>
 #include "fallback_command_queue.h"
 
 namespace luisa::compute::fallback {

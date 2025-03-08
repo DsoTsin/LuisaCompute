@@ -732,25 +732,27 @@ void LCDevice::update_sparse_resources(
         LUISA_ERROR("sparse-texture update not allowed in Direct-Storage.");
     }
     auto &queuePtr = static_cast<LCCmdBuffer *>(queue)->queue;
+    UpdateTileTracker tile_tracker;
     for (auto &&i : update_cmds) {
         luisa::visit(
             [&]<typename T>(T const &t) {
                 if constexpr (std::is_same_v<T, SparseTextureMapOperation>) {
                     auto tex = reinterpret_cast<SparseTexture *>(i.handle);
-                    tex->AllocateTile(queuePtr.Queue(), t.start_tile, t.tile_count, t.mip_level, t.allocated_heap);
+                    tex->AllocateTile(t.start_tile, t.tile_count, t.mip_level, t.allocated_heap, &tile_tracker);
                 } else if constexpr (std::is_same_v<T, SparseBufferMapOperation>) {
                     auto buffer = reinterpret_cast<SparseBuffer *>(i.handle);
-                    buffer->AllocateTile(queuePtr.Queue(), t.start_tile, t.tile_count, t.allocated_heap);
+                    buffer->AllocateTile( t.start_tile, t.tile_count, t.allocated_heap, &tile_tracker);
                 } else if constexpr (std::is_same_v<T, SparseTextureUnMapOperation>) {
                     auto tex = reinterpret_cast<SparseTexture *>(i.handle);
-                    tex->DeAllocateTile(queuePtr.Queue(), t.start_tile, t.tile_count, t.mip_level);
+                    tex->DeAllocateTile(t.start_tile, t.tile_count, t.mip_level, &tile_tracker);
                 } else {
                     auto buffer = reinterpret_cast<SparseBuffer *>(i.handle);
-                    buffer->DeAllocateTile(queuePtr.Queue(), t.start_tile, t.tile_count);
+                    buffer->DeAllocateTile( t.start_tile, t.tile_count, &tile_tracker);
                 }
             },
             i.operations);
     }
+    tile_tracker.update(queuePtr.Queue(), D3D12_TILE_MAPPING_FLAG_NONE);
     queuePtr.Signal();
 }
 
@@ -777,7 +779,7 @@ ShaderCreationInfo LCDevice::create_shader(const ShaderOption &option, const ir:
 }
 ResourceCreationInfo LCDevice::allocate_sparse_buffer_heap(size_t byte_size) noexcept {
     auto heap = reinterpret_cast<SparseHeap *>(vengine_malloc(sizeof(SparseHeap)));
-    heap->allocation = nativeDevice.defaultAllocator->AllocateBufferHeap(&nativeDevice, "sparse buffer heap", byte_size, D3D12_HEAP_TYPE_DEFAULT, &heap->heap, &heap->offset);
+    heap->allocation = nativeDevice.defaultAllocator->AllocateBufferHeap(&nativeDevice, "sparse buffer heap", byte_size, D3D12_HEAP_TYPE_DEFAULT, &heap->heap, &heap->offset, D3D12_HEAP_FLAG_NONE, true);
     heap->size_bytes = byte_size;
     ResourceCreationInfo r;
     r.handle = reinterpret_cast<uint64>(heap);
@@ -791,7 +793,7 @@ void LCDevice::deallocate_sparse_buffer_heap(uint64_t handle) noexcept {
 }
 ResourceCreationInfo LCDevice::allocate_sparse_texture_heap(size_t byte_size, bool is_compressed_type) noexcept {
     auto heap = reinterpret_cast<SparseHeap *>(vengine_malloc(sizeof(SparseHeap)));
-    heap->allocation = nativeDevice.defaultAllocator->AllocateTextureHeap(&nativeDevice, "sparse texture heap", byte_size, &heap->heap, &heap->offset, !is_compressed_type);
+    heap->allocation = nativeDevice.defaultAllocator->AllocateTextureHeap(&nativeDevice, "sparse texture heap", byte_size, &heap->heap, &heap->offset, !is_compressed_type, D3D12_HEAP_FLAG_NONE, true);
     heap->size_bytes = byte_size;
     ResourceCreationInfo r;
     r.handle = reinterpret_cast<uint64>(heap);

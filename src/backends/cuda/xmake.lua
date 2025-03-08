@@ -35,6 +35,13 @@ on_load(function(target)
             public = true
         })
     end
+    if get_config("lc_backend_lto") then
+        target:set("policy", "build.optimization.lto", true)
+        if get_config("lc_toolchain") == "llvm" then
+            target:add("ldflags", "-fuse-ld=lld-link")
+            target:add("shflags", "-fuse-ld=lld-link")
+        end
+    end
 end)
 target_end()
 
@@ -43,8 +50,7 @@ _config_project({
     project_kind = "shared",
     batch_size = 4
 })
-add_defines("LUISA_BACKEND_ENABLE_VULKAN_SWAPCHAIN")
-add_deps("lc-vulkan-swapchain", "lc-runtime", "volk", "lc-cuda-base", "reproc")
+add_deps("lc-runtime", "lc-cuda-base", "reproc")
 if get_config("enable_ir") then
     add_deps("lc-ir")
 end
@@ -62,6 +68,10 @@ on_load(function(target)
         if file_name ~= "cuda_nvrtc_compiler.cpp" then
             target:add("files", filepath)
         end
+    end
+    if get_config("_lc_vk_sdk_dir") then
+        target:add("defines", "LUISA_BACKEND_ENABLE_VULKAN_SWAPCHAIN")
+        target:add("deps", "lc-vulkan-swapchain", "volk")
     end
 end)
 add_files("extensions/cuda_denoiser.cpp", "extensions/cuda_dstorage.cpp", "extensions/cuda_pinned_memory.cpp")

@@ -59,13 +59,12 @@ private:
 
     [[nodiscard]] auto _value_ident(const Value *value) noexcept {
         auto uid = _value_uid(value);
-        if (value->derived_value_tag() == DerivedValueTag::SPECIAL_REGISTER) {
+        if (value->isa<SpecialRegister>()) {
             auto r = static_cast<const SpecialRegister *>(value);
             auto name = xir::to_string(r->derived_special_register_tag());
             return luisa::format("%{}.{}", uid, name);
         }
-        if (value->derived_value_tag() == DerivedValueTag::UNDEFINED) {
-            auto u = static_cast<const Undefined *>(value);
+        if (value->isa<Undefined>()) {
             return luisa::format("%{}.undefined", uid);
         }
         return luisa::format("%{}", uid);
@@ -106,7 +105,7 @@ private:
         static_cast<void>(_value_uid(inst));
         for (auto &use : inst->operand_uses()) {
             if (auto value = use->value();
-                value != nullptr && value->derived_value_tag() == DerivedValueTag::BASIC_BLOCK) {
+                value != nullptr && value->isa<BasicBlock>()) {
                 _traverse_values_in_basic_block(static_cast<const BasicBlock *>(value));
             }
         }
@@ -635,7 +634,7 @@ private:
             }
             _emit_indent(1);
             _main << _value_ident(arg) << ": ";
-            if (arg->derived_argument_tag() == DerivedArgumentTag::REFERENCE) {
+            if (arg->isa<ReferenceArgument>()) {
                 _main << "&";
             }
             _main << _type_ident(arg->type()) << ";";

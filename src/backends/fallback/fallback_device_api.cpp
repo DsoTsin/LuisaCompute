@@ -1,7 +1,6 @@
 #include "fallback_texture.h"
 #include "fallback_texture_bc.h"
 #include "fallback_accel.h"
-#include "fallback_device_api.h"
 
 namespace luisa::compute::fallback::api {
 
@@ -340,6 +339,20 @@ struct RayQueryContextEx {
     RayQueryOnProceduralFunc *on_procedural;
 };
 
+// possibly a curve hit, we should modify hit.v to -1
+static void ray_trace_fix_hit_for_curves(RTCScene scene, RTCRayHit *rh) noexcept {
+    if (auto inst = rh->hit.instID[0]; inst != RTC_INVALID_GEOMETRY_ID && rh->hit.v == 0.f) {
+#if LUISA_COMPUTE_FALLBACK_EMBREE_VERSION == 3
+        auto flags = reinterpret_cast<uint64_t>(rtcGetGeometryUserData(rtcGetGeometry(scene, inst)));
+#else
+        auto flags = reinterpret_cast<uint64_t>(rtcGetGeometryUserDataFromScene(scene, inst));
+#endif
+        if (flags & luisa_fallback_embree_accel_user_data_flags_curve) {
+            rh->hit.v = -1.f;
+        }
+    }
+}
+
 void luisa_fallback_accel_trace_closest(void *handle, EmbreeRayHit *ray_hit) noexcept {
 
     auto scene = static_cast<RTCScene>(handle);
@@ -361,6 +374,7 @@ void luisa_fallback_accel_trace_closest(void *handle, EmbreeRayHit *ray_hit) noe
     args.context = &ctx.rtc_ctx;
     rtcIntersect1(scene, rh, &args);
 #endif
+    ray_trace_fix_hit_for_curves(scene, rh);
 }
 
 void luisa_fallback_accel_trace_any(void *handle, EmbreeRay *ray) noexcept {
@@ -487,12 +501,16 @@ static void luisa_fallback_ray_query_surface_intersect_filter_function(const RTC
     LUISA_DEBUG_ASSERT(args->valid[0] == -1, "Only valid ray is support.");
     auto ctx = reinterpret_cast<RayQueryContextEx *>(args->context);
     auto ray = reinterpret_cast<RTCRay *>(args->ray);
-    if (args->geometryUserPtr) {// opaque, always commit
+    auto hit = reinterpret_cast<RTCHit *>(args->hit);
+    auto flags = reinterpret_cast<uint64_t>(args->geometryUserPtr);
+    if (flags & luisa_fallback_embree_accel_user_data_flags_curve) {// curve
+        hit->v = -1.f;
+    }
+    if (flags & luisa_fallback_embree_accel_user_data_flags_opaque) {// opaque, always commit
         ray_query_update_current_t(ctx, ray->tfar);
     } else if (auto on_surface = ctx->on_surface) {
         auto q = ctx->base.q;
         auto candidate = &q->candidate;
-        auto hit = reinterpret_cast<RTCHit *>(args->hit);
         ray_query_decode_surface_candidate(candidate, ray, hit);
         on_surface(reinterpret_cast<LC_RayQueryObject *>(q), ctx->capture);
         if (candidate->committed) {
@@ -524,8 +542,12 @@ static void luisa_fallback_ray_query_surface_occluded_filter_function(const RTCF
     auto ctx = reinterpret_cast<RayQueryContextEx *>(args->context);
     auto ray = reinterpret_cast<RTCRay *>(args->ray);
     auto hit = reinterpret_cast<RTCHit *>(args->hit);
+    auto flags = reinterpret_cast<uint64_t>(args->geometryUserPtr);
+    if (flags & luisa_fallback_embree_accel_user_data_flags_curve) {// curve
+        hit->v = -1.f;
+    }
     auto q = ctx->base.q;
-    if (args->geometryUserPtr) {// opaque
+    if (flags & luisa_fallback_embree_accel_user_data_flags_opaque) {// opaque
         record_hit_data(q, ray, hit);
     } else if (auto on_surface = ctx->on_surface) {
         auto candidate = &q->candidate;
@@ -573,6 +595,7 @@ void luisa_fallback_ray_query_pipeline_all(LC_RayQueryObject *query_object, cons
     rtcIntersect1(scene, &q->ray_hit, &args);
 #endif
     q->ray_hit.hit.Ng_z = ctx.current_t;
+    ray_trace_fix_hit_for_curves(scene, &q->ray_hit);
 }
 
 void luisa_fallback_ray_query_pipeline_any(LC_RayQueryObject *query_object, const void *capture, RayQueryOnSurfaceFunc *on_surface, RayQueryOnProceduralFunc *on_procedural) noexcept {

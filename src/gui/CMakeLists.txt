@@ -31,7 +31,7 @@ if (LUISA_COMPUTE_ENABLE_GUI)
     target_link_libraries(luisa-compute-gui PUBLIC luisa-compute-runtime luisa-compute-dsl)
     target_compile_definitions(luisa-compute-gui
             PRIVATE LC_GUI_EXPORT_DLL
-            PUBLIC LUISA_ENABLE_GUI=1 GLFW_INCLUDE_NONE)
+            PUBLIC LUISA_ENABLE_GUI=1 GLFW_INCLUDE_NONE IMGUI_DEFINE_MATH_OPERATORS)
     if (WIN32)
         target_compile_definitions(luisa-compute-gui PRIVATE
                 "IMGUI_API=__declspec(dllexport)"

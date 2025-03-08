@@ -129,8 +129,10 @@ Device::Device(Context &&ctx, DeviceConfig const *settings)
         };
 
         luisa::optional<DirectXDeviceConfigExt::ExternalDevice> extDevice;
+        luisa::optional<DirectXDeviceConfigExt::GPUAllocatorSettings> allocSettings;
         if (deviceSettings) {
             extDevice = deviceSettings->CreateExternalDevice();
+            allocSettings = deviceSettings->GetGPUAllocatorSettings();
         }
         if (extDevice) {
             device = {static_cast<ID3D12Device5 *>(extDevice->device), false};
@@ -226,7 +228,15 @@ Device::Device(Context &&ctx, DeviceConfig const *settings)
             }
             static_cast<void>(fileIo->write_shader_cache("dx_adapterid", {reinterpret_cast<std::byte const *>(&adapterID), sizeof(vstd::MD5)}));
         }
-        defaultAllocator = vstd::make_unique<GpuAllocator>(this, profiler);
+        if (allocSettings)
+            defaultAllocator = vstd::make_unique<GpuAllocator>(
+                this,
+                profiler,
+                allocSettings->preferred_block_size,
+                allocSettings->sparse_buffer_block_size,
+                allocSettings->sparse_image_block_size);
+        else
+            defaultAllocator = vstd::make_unique<GpuAllocator>(this, profiler, 0, 0, 0);
         allocatorInterface.device = this;
         globalHeap = vstd::create_unique(
             new DescriptorHeap(

@@ -1,5 +1,9 @@
 #pragma once
 
+namespace luisa::compute {
+struct MotionInstanceTransform;
+}// namespace luisa::compute
+
 #ifndef LUISA_COMPUTE_FALLBACK_DEVICE_LIB
 #include <cstdint>
 #include <cstddef>
@@ -171,10 +175,16 @@ struct alignas(16) EmbreeRayHit;
 struct alignas(16) AccelInstance {
     float affine[12];
     uint8_t mask;
-    bool opaque;
-    bool dirty;
+    uint8_t opaque : 1;
+    uint8_t dirty : 1;
+    uint8_t is_curve : 1;
+    uint8_t is_motion : 1;
+    uint8_t is_srt : 1;
+    uint8_t is_matrix : 1;
+    uint8_t padding : 2;
+    uint8_t motion_steps;
     uint user_id;
-    void *geometry;
+    MotionInstanceTransform *motion;
 };
 
 static_assert(sizeof(AccelInstance) == 64u);
@@ -201,6 +211,9 @@ struct alignas(16) RayQueryCandidate {
     int committed;
     int terminated;
 };
+
+static constexpr uint64_t luisa_fallback_embree_accel_user_data_flags_opaque = 1u << 0u;
+static constexpr uint64_t luisa_fallback_embree_accel_user_data_flags_curve = 1u << 1u;
 
 using RayQueryOnSurfaceFunc = void(LC_RayQueryObject *, const void *capture) noexcept;
 using RayQueryOnProceduralFunc = void(LC_RayQueryObject *, const void *capture) noexcept;

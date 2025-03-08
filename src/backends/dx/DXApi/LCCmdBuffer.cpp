@@ -18,6 +18,9 @@
 #include <Resource/SparseTexture.h>
 #include <luisa/backends/ext/dx_custom_cmd.h>
 #include "../../common/shader_print_formatter.h"
+#ifdef LCDX_ENABLE_WINPIX
+#include <WinPixEventRuntime/pix3.h>
+#endif
 
 namespace lc::dx {
 using Argument = luisa::compute::Argument;
@@ -403,6 +406,11 @@ public:
         }
     }
 };
+#ifdef LCDX_ENABLE_WINPIX
+inline DWORD get_pix_color() {
+    return ~0;
+}
+#endif
 class LCCmdVisitor : public CommandVisitor {
 public:
     Device *device;
@@ -420,6 +428,12 @@ public:
     vstd::func_ptr_t<void(Device *, CommandBufferBuilder *)> after_custom_cmd{};
 
     void visit(const BufferUploadCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Buffer upload");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         BufferView bf(
             reinterpret_cast<Buffer const *>(cmd->handle()),
             cmd->offset(),
@@ -428,6 +442,12 @@ public:
     }
 
     void visit(const BufferDownloadCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Buffer download");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         BufferView bf(
             reinterpret_cast<Buffer const *>(cmd->handle()),
             cmd->offset(),
@@ -437,6 +457,12 @@ public:
             cmd->data());
     }
     void visit(const BufferCopyCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Buffer copy");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto srcBf = reinterpret_cast<Buffer const *>(cmd->src_handle());
         auto dstBf = reinterpret_cast<Buffer const *>(cmd->dst_handle());
         bd->CopyBuffer(
@@ -447,6 +473,12 @@ public:
             cmd->size());
     }
     void visit(const BufferToTextureCopyCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Buffer copy to texture");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto rt = reinterpret_cast<TextureBase *>(cmd->texture());
         auto bf = reinterpret_cast<Buffer *>(cmd->buffer());
         bd->CopyBufferTexture(
@@ -514,6 +546,12 @@ public:
         }
     };
     void visit(const ShaderDispatchCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Shader dispatch");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         bindProps->clear();
         auto shader = reinterpret_cast<ComputeShader const *>(cmd->handle());
         auto &&tempBuffer = *bufferVec;
@@ -620,7 +658,12 @@ public:
         }
     }
     void visit(const TextureUploadCommand *cmd) noexcept override {
-
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Texture upload");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto rt = reinterpret_cast<TextureBase *>(cmd->handle());
         auto copyInfo = CommandBufferBuilder::GetCopyTextureBufferSize(
             rt,
@@ -655,6 +698,12 @@ public:
             false);
     }
     void visit(const ClearDepthCommand *cmd) noexcept {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Clear depth");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto rt = reinterpret_cast<TextureBase *>(cmd->handle());
         auto cmdList = bd->GetCB()->CmdList();
         auto alloc = bd->GetCB()->GetAlloc();
@@ -673,6 +722,12 @@ public:
         cmdList->ClearDepthStencilView(dsvHandle, clearFlags, cmd->value(), 0, 1, &rect);
     }
     void visit(const TextureDownloadCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Texture download");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto rt = reinterpret_cast<TextureBase *>(cmd->handle());
         auto copyInfo = CommandBufferBuilder::GetCopyTextureBufferSize(
             rt,
@@ -719,6 +774,12 @@ public:
             false);
     }
     void visit(const TextureCopyCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Texture copy");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto src = reinterpret_cast<TextureBase *>(cmd->src_handle());
         auto dst = reinterpret_cast<TextureBase *>(cmd->dst_handle());
         bd->CopyTexture(
@@ -730,6 +791,12 @@ public:
             cmd->dst_level());
     }
     void visit(const TextureToBufferCopyCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Texture copy to buffer");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto rt = reinterpret_cast<TextureBase *>(cmd->texture());
         auto bf = reinterpret_cast<Buffer *>(cmd->buffer());
         bd->CopyBufferTexture(
@@ -742,6 +809,12 @@ public:
             true);
     }
     void visit(const AccelBuildCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Accel build");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto accel = reinterpret_cast<TopAccel *>(cmd->handle());
         vstd::optional<BufferView> scratch;
         if (!cmd->update_instance_buffer_only()) {
@@ -776,14 +849,33 @@ public:
         bottomAccelData++;
     }
     void visit(const CurveBuildCommand *) noexcept override { /* TODO */
+        LUISA_NOT_IMPLEMENTED();
     }
     void visit(const MeshBuildCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Mesh build");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         BottomBuild(cmd->handle());
     }
     void visit(const ProceduralPrimitiveBuildCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Procedural build");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         BottomBuild(cmd->handle());
     }
     void visit(const BindlessArrayUpdateCommand *cmd) noexcept override {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Bindless-array update");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         auto arr = reinterpret_cast<BindlessArray *>(cmd->handle());
         arr->UpdateStates(
             *bd,
@@ -814,6 +906,12 @@ public:
         }
     }
     void visit(const DrawRasterSceneCommand *cmd) noexcept {
+#ifdef LCDX_ENABLE_WINPIX
+        PIXBeginEvent(bd->GetCB()->CmdList(), get_pix_color(), "Draw raster command");
+        auto dispose_pix = vstd::scope_exit([&]() {
+            PIXEndEvent(bd->GetCB()->CmdList());
+        });
+#endif
         bindProps->clear();
         auto cmdList = bd->GetCB()->CmdList();
         auto rtvs = cmd->rtv_texs();

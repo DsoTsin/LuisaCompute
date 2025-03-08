@@ -169,11 +169,13 @@ int main(int argc, char *argv[]) {
         auto ray = generate_ray(make_float2(coord) + u.xy());
         auto time = u.z * 1.f;
         auto hit = accel.intersect_motion(ray, time, {.curve_bases = {curve_basis}});
-        $if (!hit->miss()) {
+        $if (hit->is_triangle()) {
             constexpr auto red = make_float3(1.0f, 0.0f, 0.0f);
             constexpr auto green = make_float3(0.0f, 1.0f, 0.0f);
             constexpr auto blue = make_float3(0.0f, 0.0f, 1.0f);
             color = triangle_interpolate(hit.bary, red, green, blue);
+        } $elif (hit->is_curve()) {
+            color = lerp(make_float3(0.f), make_float3(1.f), hit->curve_parameter());
         };
         auto old = image.read(coord.y * dispatch_size_x() + coord.x).xyz();
         auto t = 1.0f / (frame_index + 1.0f);

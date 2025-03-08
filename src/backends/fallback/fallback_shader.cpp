@@ -401,7 +401,7 @@ FallbackShader::FallbackShader(FallbackDevice *device, const ShaderOption &optio
             LUISA_WARNING_WITH_LOCATION("LLJIT::lookup(): {}", err.message());
         });
     }
-    LUISA_ASSERT(addr, "JIT compilation failed with error [{}]");
+    LUISA_ASSERT(addr, "JIT compilation failed.");
     _kernel_entry = addr->toPtr<kernel_entry_t>();
 
     // compute argument buffer size

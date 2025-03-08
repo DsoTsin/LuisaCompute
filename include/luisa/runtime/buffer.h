@@ -1,6 +1,5 @@
 #pragma once
 
-#include <luisa/core/concepts.h>
 #include <luisa/core/mathematics.h>
 #include <luisa/runtime/rhi/command.h>
 #include <luisa/runtime/rhi/resource.h>
@@ -35,6 +34,9 @@ struct buffer_element_impl {
 };
 
 }// namespace detail
+
+class ByteBuffer;
+class ByteBufferView;
 
 template<typename T>
 using is_buffer = detail::is_buffer_impl<std::remove_cvref_t<T>>;
@@ -135,7 +137,7 @@ public:
     [[nodiscard]] auto view() const noexcept {
         _check_is_valid();
         return BufferView<T>{this->native_handle(), this->handle(), _element_stride, 0u, _size, _size};
-    }    
+    }
     [[nodiscard]] auto view(size_t offset, size_t count) const noexcept {
         return view().subview(offset, count);
     }
@@ -144,15 +146,27 @@ public:
     [[nodiscard]] auto copy_to(void *data) const noexcept {
         return this->view().copy_to(data);
     }
+    // copy buffer's data to another buffer
+    [[nodiscard]] auto copy_to(BufferView<T> dst) const noexcept {
+        return this->view().copy_to(dst);
+    }
+    // copy buffer's data to a byte buffer
+    [[nodiscard]] auto copy_to(const ByteBufferView &dst) const noexcept {
+        return this->view().copy_to(dst);
+    }
     // copy pointer's data to buffer
-    [[nodiscard]] auto copy_from(const void *data) noexcept {
+    [[nodiscard]] auto copy_from(const void *data) const noexcept {
         return this->view().copy_from(data);
     }
-    [[nodiscard]] auto copy_from(const void *data, luisa::move_only_function<void(void*)>&& upload_callback) noexcept {
+    [[nodiscard]] auto copy_from(const void *data, luisa::move_only_function<void(void *)> &&upload_callback) const noexcept {
         return this->view().copy_from(data, std::move(upload_callback));
     }
     // copy source buffer's data to buffer
-    [[nodiscard]] auto copy_from(BufferView<T> source) noexcept {
+    [[nodiscard]] auto copy_from(BufferView<T> source) const noexcept {
+        return this->view().copy_from(source);
+    }
+    // copy source byte buffer's data to buffer
+    [[nodiscard]] auto copy_from(const ByteBufferView &source) const noexcept {
         return this->view().copy_from(source);
     }
     // DSL interface
@@ -241,12 +255,18 @@ public:
     [[nodiscard]] auto copy_to(void *data) const noexcept {
         return luisa::make_unique<BufferDownloadCommand>(_handle, offset_bytes(), size_bytes(), data);
     }
+    // copy buffer's data to another buffer
+    [[nodiscard]] auto copy_to(BufferView<T> dst) const noexcept {
+        return dst.copy_from(*this);
+    }
+    // copy buffer's data to a byte buffer
+    [[nodiscard]] luisa::unique_ptr<BufferCopyCommand> copy_to(const ByteBufferView &dst) const noexcept;
     // copy pointer's data to buffer
-    [[nodiscard]] auto copy_from(const void *data) noexcept {
+    [[nodiscard]] auto copy_from(const void *data) const noexcept {
         return luisa::make_unique<BufferUploadCommand>(this->handle(), this->offset_bytes(), this->size_bytes(), data);
     }
     // copy source buffer's data to buffer
-    [[nodiscard]] auto copy_from(BufferView<T> source) noexcept {
+    [[nodiscard]] auto copy_from(BufferView<T> source) const noexcept {
         if (source.size() != this->size()) [[unlikely]] {
             detail::error_buffer_copy_sizes_mismatch(source.size(), this->size());
         }
@@ -255,6 +275,8 @@ public:
             source.offset_bytes(), this->offset_bytes(),
             this->size_bytes());
     }
+    // copy source byte buffer's data to buffer
+    [[nodiscard]] luisa::unique_ptr<BufferCopyCommand> copy_from(const ByteBufferView &source) const noexcept;
     // DSL interface
     [[nodiscard]] auto operator->() const noexcept {
         return reinterpret_cast<const detail::BufferExprProxy<BufferView<T>> *>(this);
@@ -268,11 +290,18 @@ template<typename T>
 BufferView(BufferView<T>) -> BufferView<T>;
 
 namespace detail {
+
 template<typename T>
 struct is_buffer_impl<Buffer<T>> : std::true_type {};
 
 template<typename T>
 struct is_buffer_view_impl<BufferView<T>> : std::true_type {};
+
+template<>
+struct is_buffer_impl<ByteBuffer> : std::true_type {};
+
+template<>
+struct is_buffer_view_impl<ByteBufferView> : std::true_type {};
 
 template<typename T>
 struct buffer_element_impl<Buffer<T>> {

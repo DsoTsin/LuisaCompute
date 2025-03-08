@@ -4,10 +4,11 @@
 #include <thread>
 #include <condition_variable>
 
-#include <luisa/core/basic_types.h>
 #include <luisa/core/stl/queue.h>
 #include <luisa/core/stl/functional.h>
 #include <luisa/runtime/rhi/device_interface.h>
+
+#ifdef LUISA_COMPUTE_ENABLE_SYSTEM_PARALLEL_FOR
 
 #if defined(LUISA_PLATFORM_APPLE)
 #define LUISA_FALLBACK_USE_DISPATCH_QUEUE
@@ -22,12 +23,16 @@
 #define LUISA_FALLBACK_USE_TBB
 #include <tbb/parallel_for.h>
 #else
-#define LUISA_FALLBACK_USE_AKR_THREAD_POOL
+#define LUISA_FALLBACK_USE_AKARI_THREAD_POOL
+#endif
+
+#else
+#define LUISA_FALLBACK_USE_AKARI_THREAD_POOL
 #endif
 
 namespace luisa::compute::fallback {
 
-struct AkrThreadPool;
+class AkrThreadPool;
 
 class FallbackCommandQueue {
 
@@ -46,8 +51,8 @@ private:
 
 #if defined(LUISA_FALLBACK_USE_DISPATCH_QUEUE)
     dispatch_queue_t _dispatch_queue{nullptr};
-#elif defined(LUISA_FALLBACK_USE_AKR_THREAD_POOL)
-    AkrThreadPool *_worker_pool{nullptr};
+#elif defined(LUISA_FALLBACK_USE_AKARI_THREAD_POOL)
+    luisa::unique_ptr<AkrThreadPool> _worker_pool;
 #endif
 
 private:

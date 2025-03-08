@@ -106,10 +106,8 @@ void dynamic_module_destroy(void *handle) noexcept {
     if (handle != nullptr) { FreeLibrary(reinterpret_cast<HMODULE>(handle)); }
 }
 
-void *dynamic_module_find_symbol(void *handle, luisa::string_view name_view) noexcept {
-    static thread_local luisa::string name;
-    name = name_view;
-    auto symbol = GetProcAddress(reinterpret_cast<HMODULE>(handle), name.c_str());
+void *dynamic_module_find_symbol(void *handle, const char *name) noexcept {
+    auto symbol = GetProcAddress(reinterpret_cast<HMODULE>(handle), name);
     if (symbol == nullptr) [[unlikely]] {
         LUISA_WARNING("Failed to load symbol '{}', reason: {}.",
                       name, detail::win32_last_error_message());
@@ -249,11 +247,9 @@ void dynamic_module_destroy(void *handle) noexcept {
     if (handle != nullptr) { dlclose(handle); }
 }
 
-void *dynamic_module_find_symbol(void *handle, luisa::string_view name_view) noexcept {
-    static thread_local luisa::string name;
-    name = name_view;
+void *dynamic_module_find_symbol(void *handle, const char *name) noexcept {
     Clock clock;
-    auto symbol = dlsym(handle, name.c_str());
+    auto symbol = dlsym(handle, name);
     if (symbol == nullptr) [[unlikely]] {
         LUISA_WARNING("Failed to load symbol '{}', reason: {}.",
                       name, dlerror());
@@ -396,8 +392,6 @@ luisa::string current_executable_path() noexcept {
 namespace luisa {
 luisa::string to_string(const TraceItem &item) noexcept {
     using namespace std::string_view_literals;
-    return luisa::format(
-        FMT_STRING("[0x{:012x}]: {} :: {} + {}"sv),
-        item.address, item.module, item.symbol, item.offset);
+    return luisa::format("{}", item);
 }
 }// namespace luisa

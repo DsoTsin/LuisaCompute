@@ -1,7 +1,7 @@
 if get_config("vk_backend") or get_config("dx_backend") then
     includes("hlsl/builtin")
 end
-if (get_config("cuda_backend") or get_config("cpu_backend")) then
+if get_config("_lc_vk_sdk_dir") and (get_config("cuda_backend") or get_config("cpu_backend")) then
     target("lc-vulkan-swapchain")
     _config_project({
         project_kind = "object"

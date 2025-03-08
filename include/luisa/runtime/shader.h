@@ -15,6 +15,7 @@
 namespace luisa::compute {
 
 class Accel;
+class ByteBufferView;
 class BindlessArray;
 class IndirectDispatchBuffer;
 
@@ -44,6 +45,11 @@ struct prototype_to_shader_invocation {
 template<typename T>
 struct prototype_to_shader_invocation<Buffer<T>> {
     using type = BufferView<T>;
+};
+
+template<>
+struct prototype_to_shader_invocation<ByteBuffer> {
+    using type = ByteBufferView;
 };
 
 template<typename T>
@@ -103,6 +109,7 @@ public:
     }
 
     ShaderInvokeBase &operator<<(const ByteBuffer &buffer) noexcept;
+    ShaderInvokeBase &operator<<(const ByteBufferView &buffer) noexcept;
 
     template<typename T>
     ShaderInvokeBase &operator<<(const Image<T> &image) noexcept {

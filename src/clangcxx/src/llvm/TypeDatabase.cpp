@@ -285,9 +285,9 @@ const luisa::compute::Type *TypeDatabase::RecordAsBuiltinType(const QualType Ty)
     }
 
     if (ext_builtin) {
-        const auto is_image = builtin_type_name.startswith("image");
-        const auto is_volume = builtin_type_name.startswith("volume");
-        const auto is_buffer = builtin_type_name.startswith("buffer");
+        const auto is_image = builtin_type_name.starts_with("image");
+        const auto is_volume = builtin_type_name.starts_with("volume");
+        const auto is_buffer = builtin_type_name.starts_with("buffer");
         if (builtin_type_name == "vec") {
             if (auto TSD = GetClassTemplateSpecializationDecl(Ty)) {
                 auto &Arguments = TSD->getTemplateArgs();

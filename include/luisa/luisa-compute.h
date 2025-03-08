@@ -239,6 +239,7 @@
 #include <luisa/xir/module.h>
 #include <luisa/xir/passes/aggregate_field_bitmask.h>
 #include <luisa/xir/passes/autodiff.h>
+#include <luisa/xir/passes/call_graph.h>
 #include <luisa/xir/passes/dce.h>
 #include <luisa/xir/passes/dom_tree.h>
 #include <luisa/xir/passes/early_return_elimination.h>
@@ -248,6 +249,7 @@
 #include <luisa/xir/passes/mem2reg.h>
 #include <luisa/xir/passes/outline.h>
 #include <luisa/xir/passes/pointer_usage.h>
+#include <luisa/xir/passes/promote_ref_arg.h>
 #include <luisa/xir/passes/reg2mem.h>
 #include <luisa/xir/passes/sroa.h>
 #include <luisa/xir/passes/trace_gep.h>

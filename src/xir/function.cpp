@@ -116,8 +116,7 @@ void traverse_basic_block_pre_order(luisa::unordered_set<BasicBlock *> &visited,
         visit(visit_ctx, block);
         auto terminator = block->terminator();
         for (auto use : terminator->operand_uses()) {
-            if (auto v = use->value();
-                v != nullptr && v->derived_value_tag() == DerivedValueTag::BASIC_BLOCK) {
+            if (auto v = use->value(); v != nullptr && v->isa<BasicBlock>()) {
                 traverse_basic_block_pre_order(visited, static_cast<BasicBlock *>(v), visit_ctx, visit);
             }
         }
@@ -129,8 +128,7 @@ void traverse_basic_block_post_order(luisa::unordered_set<BasicBlock *> &visited
     if (visited.emplace(block).second) {
         auto terminator = block->terminator();
         for (auto use : terminator->operand_uses()) {
-            if (auto v = use->value();
-                v != nullptr && v->derived_value_tag() == DerivedValueTag::BASIC_BLOCK) {
+            if (auto v = use->value(); v != nullptr && v->isa<BasicBlock>()) {
                 traverse_basic_block_post_order(visited, static_cast<BasicBlock *>(v), visit_ctx, visit);
             }
         }

@@ -191,9 +191,77 @@ template<typename T, access a>
     return t.read(uv);
 }
 
+constant const sampler lc_samplers[16] = {
+    sampler(coord::normalized, address::clamp_to_edge, filter::nearest, mip_filter::none),
+    sampler(coord::normalized, address::repeat, filter::nearest, mip_filter::none),
+    sampler(coord::normalized, address::mirrored_repeat, filter::nearest, mip_filter::none),
+    sampler(coord::normalized, address::clamp_to_zero, filter::nearest, mip_filter::none),
+    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::none),
+    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::none),
+    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::none),
+    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::none),
+    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear, max_anisotropy(1)),
+    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::linear, max_anisotropy(1)),
+    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear, max_anisotropy(1)),
+    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear, max_anisotropy(1)),
+    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear, max_anisotropy(16)),
+    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::linear),          // FIXME: max_anisotropy(16) causes ICE
+    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear), // FIXME: max_anisotropy(16) causes ICE
+    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear),   // FIXME: max_anisotropy(16) causes ICE
+};
+
+[[nodiscard]] inline sampler get_sampler(uint code) {
+    __builtin_assume(code < 16u);
+    return lc_samplers[code];
+}
+
+[[nodiscard]] inline auto sampler_code_uint(uint filter, uint address) {
+  return get_sampler((filter << 2u) | address);
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample(texture2d<T, a> t, float2 uv, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uv);
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_level(texture2d<T, a> t, float2 uv, float lod, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uv, level(lod));
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_grad(texture2d<T, a> t, float2 uv, float2 dpdx, float2 dpdy, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uv, gradient2d(dpdx, dpdy));
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_grad_level(texture2d<T, a> t, float2 uv, float2 dpdx, float2 dpdy, float min_level, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uv, gradient2d(dpdx, dpdy), min_lod_clamp(min_level));
+}
+
 template<typename T, access a>
 [[nodiscard]] inline auto texture_read(texture3d<T, a> t, uint3 uvw) {
     return t.read(uvw);
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample(texture3d<T, a> t, float3 uvw, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uvw);
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_level(texture3d<T, a> t, float3 uvw, float lod, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uvw, level(lod));
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_grad(texture3d<T, a> t, float3 uvw, float3 dpdx, float3 dpdy, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uvw, gradient3d(dpdx, dpdy));
+}
+
+template<typename T, access a>
+[[nodiscard]] inline auto texture_sample_grad_level(texture3d<T, a> t, float3 uvw, float3 dpdx, float3 dpdy, float min_level, uint filter, uint address) {
+    return t.sample(sampler_code_uint(filter, address), uvw, gradient3d(dpdx, dpdy), min_lod_clamp(min_level));
 }
 
 template<typename T, access a>
@@ -478,33 +546,14 @@ struct LCBindlessArray {
     device const LCBindlessItem *items;
 };
 
-constant const sampler lc_samplers[16] = {
-    sampler(coord::normalized, address::clamp_to_edge, filter::nearest, mip_filter::none),
-    sampler(coord::normalized, address::repeat, filter::nearest, mip_filter::none),
-    sampler(coord::normalized, address::mirrored_repeat, filter::nearest, mip_filter::none),
-    sampler(coord::normalized, address::clamp_to_zero, filter::nearest, mip_filter::none),
-    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::none),
-    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::none),
-    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::none),
-    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::none),
-    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear, max_anisotropy(1)),
-    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::linear, max_anisotropy(1)),
-    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear, max_anisotropy(1)),
-    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear, max_anisotropy(1)),
-    sampler(coord::normalized, address::clamp_to_edge, filter::linear, mip_filter::linear, max_anisotropy(16)),
-    sampler(coord::normalized, address::repeat, filter::linear, mip_filter::linear),          // FIXME: max_anisotropy(16) causes ICE
-    sampler(coord::normalized, address::mirrored_repeat, filter::linear, mip_filter::linear), // FIXME: max_anisotropy(16) causes ICE
-    sampler(coord::normalized, address::clamp_to_zero, filter::linear, mip_filter::linear),   // FIXME: max_anisotropy(16) causes ICE
-};
-
-[[nodiscard]] inline sampler get_sampler(uint code) {
-    __builtin_assume(code < 16u);
-    return lc_samplers[code];
-}
-
 [[nodiscard]] inline auto bindless_texture_sample2d(LCBindlessArray array, uint index, float2 uv) {
     auto t = array.items[index];
     return t.tex2d.sample(get_sampler(t.sampler2d), uv);
+}
+
+[[nodiscard]] inline auto bindless_texture_sample2d_sample(LCBindlessArray array, uint index, float2 uv, uint filter, uint address) {
+    auto t = array.items[index];
+    return t.tex2d.sample(sampler_code_uint(filter, address), uv);
 }
 
 [[nodiscard]] inline auto bindless_texture_sample3d(LCBindlessArray array, uint index, float3 uvw) {
@@ -512,9 +561,19 @@ constant const sampler lc_samplers[16] = {
     return t.tex3d.sample(get_sampler(t.sampler3d), uvw);
 }
 
+[[nodiscard]] inline auto bindless_texture_sample3d_sample(LCBindlessArray array, uint index, float3 uvw, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex3d.sample(sampler_code_uint(filter, address), uvw);
+}
+
 [[nodiscard]] inline auto bindless_texture_sample2d_level(LCBindlessArray array, uint index, float2 uv, float lod) {
     device const auto &t = array.items[index];
     return t.tex2d.sample(get_sampler(t.sampler2d), uv, level(lod));
+}
+
+[[nodiscard]] inline auto bindless_texture_sample2d_level_sample(LCBindlessArray array, uint index, float2 uv, float lod, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex2d.sample(sampler_code_uint(filter, address), uv, level(lod));
 }
 
 [[nodiscard]] inline auto bindless_texture_sample3d_level(LCBindlessArray array, uint index, float3 uvw, float lod) {
@@ -522,9 +581,19 @@ constant const sampler lc_samplers[16] = {
     return t.tex3d.sample(get_sampler(t.sampler3d), uvw, level(lod));
 }
 
+[[nodiscard]] inline auto bindless_texture_sample3d_level_sample(LCBindlessArray array, uint index, float3 uvw, float lod, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex3d.sample(sampler_code_uint(filter, address), uvw, level(lod));
+}
+
 [[nodiscard]] inline auto bindless_texture_sample2d_grad(LCBindlessArray array, uint index, float2 uv, float2 dpdx, float2 dpdy) {
     device const auto &t = array.items[index];
     return t.tex2d.sample(get_sampler(t.sampler2d), uv, gradient2d(dpdx, dpdy));
+}
+
+[[nodiscard]] inline auto bindless_texture_sample2d_grad_sample(LCBindlessArray array, uint index, float2 uv, float2 dpdx, float2 dpdy, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex2d.sample(sampler_code_uint(filter, address), uv, gradient2d(dpdx, dpdy));
 }
 
 [[nodiscard]] inline auto bindless_texture_sample3d_grad(LCBindlessArray array, uint index, float3 uvw, float3 dpdx, float3 dpdy) {
@@ -532,14 +601,29 @@ constant const sampler lc_samplers[16] = {
     return t.tex3d.sample(get_sampler(t.sampler3d), uvw, gradient3d(dpdx, dpdy));
 }
 
+[[nodiscard]] inline auto bindless_texture_sample3d_grad_sample(LCBindlessArray array, uint index, float3 uvw, float3 dpdx, float3 dpdy, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex3d.sample(sampler_code_uint(filter, address), uvw, gradient3d(dpdx, dpdy));
+}
+
 [[nodiscard]] inline auto bindless_texture_sample2d_grad_level(LCBindlessArray array, uint index, float2 uv, float2 dpdx, float2 dpdy, float min_level) {
     device const auto &t = array.items[index];
     return t.tex2d.sample(get_sampler(t.sampler2d), uv, gradient2d(dpdx, dpdy), min_lod_clamp(min_level));
 }
 
+[[nodiscard]] inline auto bindless_texture_sample2d_grad_level_sample(LCBindlessArray array, uint index, float2 uv, float2 dpdx, float2 dpdy, float min_level, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex2d.sample(sampler_code_uint(filter, address), uv, gradient2d(dpdx, dpdy), min_lod_clamp(min_level));
+}
+
 [[nodiscard]] inline auto bindless_texture_sample3d_grad_level(LCBindlessArray array, uint index, float3 uvw, float3 dpdx, float3 dpdy, float min_level) {
     device const auto &t = array.items[index];
     return t.tex3d.sample(get_sampler(t.sampler3d), uvw, gradient3d(dpdx, dpdy), min_lod_clamp(min_level));
+}
+
+[[nodiscard]] inline auto bindless_texture_sample3d_grad_level_sample(LCBindlessArray array, uint index, float3 uvw, float3 dpdx, float3 dpdy, float min_level, uint filter, uint address) {
+    device const auto &t = array.items[index];
+    return t.tex3d.sample(sampler_code_uint(filter, address), uvw, gradient3d(dpdx, dpdy), min_lod_clamp(min_level));
 }
 
 [[nodiscard]] inline auto bindless_texture_size2d(LCBindlessArray array, uint i) {
@@ -602,13 +686,13 @@ inline void bindless_buffer_write(LCBindlessArray array, uint buffer_index, uint
 }
 
 template<typename T>
-[[nodiscard]] inline auto bindless_byte_address_buffer_read(LCBindlessArray array, uint buffer_index, uint offset) {
-    return *reinterpret_cast<device const T *>(static_cast<device const char *>(array.items[buffer_index].buffer) + offset);
+[[nodiscard]] inline auto bindless_byte_address_buffer_read(LCBindlessArray array, uint buffer_index, ulong offset) {
+    return *reinterpret_cast<device const T *>(bindless_buffer_address(array, buffer_index) + offset);
 }
 
 template<typename T>
 inline void bindless_byte_address_buffer_write(LCBindlessArray array, uint buffer_index, uint offset, T value) {
-    *reinterpret_cast<device T *>(static_cast<device char *>(array.items[buffer_index].buffer) + offset) = value;
+    *reinterpret_cast<device T *>(bindless_buffer_address(array, buffer_index) + offset) = value;
 }
 
 using namespace metal::raytracing;

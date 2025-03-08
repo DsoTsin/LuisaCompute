@@ -39,6 +39,7 @@ end
 if get_config("enable_clangcxx") then
     includes("clangcxx")
 end
+
 if get_config("enable_xir") then
     includes("xir")
 end

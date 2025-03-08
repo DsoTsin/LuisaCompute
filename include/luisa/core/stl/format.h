@@ -12,6 +12,7 @@
 
 #include <luisa/core/basic_types.h>
 #include <luisa/core/stl/string.h>
+#include <luisa/core/platform.h>// for TraceItem
 
 namespace luisa {
 
@@ -45,11 +46,11 @@ namespace fmt {
 
 template<typename T, size_t N>
 struct formatter<luisa::Vector<T, N>> {
-    constexpr auto parse(format_parse_context &ctx) const -> decltype(ctx.begin()) {
+    constexpr auto parse(format_parse_context &ctx) const noexcept {
         return ctx.end();
     }
     template<typename FormatContext>
-    auto format(const luisa::Vector<T, N> &v, FormatContext &ctx) const -> decltype(ctx.out()) {
+    auto format(const luisa::Vector<T, N> &v, FormatContext &ctx) const noexcept {
         using namespace std::string_view_literals;
         using luisa::uint;
         using luisa::ushort;
@@ -91,11 +92,11 @@ struct formatter<luisa::Vector<T, N>> {
 
 template<size_t N>
 struct formatter<luisa::Matrix<N>> {
-    constexpr auto parse(format_parse_context &ctx) const -> decltype(ctx.begin()) {
+    constexpr auto parse(format_parse_context &ctx) const noexcept {
         return ctx.end();
     }
     template<typename FormatContext>
-    auto format(const luisa::Matrix<N> &m, FormatContext &ctx) const -> decltype(ctx.out()) {
+    auto format(const luisa::Matrix<N> &m, FormatContext &ctx) const noexcept {
         if constexpr (N == 2u) {
             return fmt::format_to(
                 ctx.out(),
@@ -132,16 +133,17 @@ struct formatter<luisa::Matrix<N>> {
     }
 };
 
-// template<typename T, size_t N>
-// struct formatter<std::array<T, N>> {
-//     constexpr auto parse(format_parse_context &ctx) const -> decltype(ctx.begin()) {
-//         return ctx.end();
-//     }
-//     template<typename FormatContext>
-//     auto format(const std::array<T, N> &a, FormatContext &ctx) const -> decltype(ctx.out()) {
-//         return fmt::format_to(ctx.out(), FMT_STRING("[{}]"), fmt::join(a, ", "));
-//     }
-// };
+template<>
+struct formatter<luisa::TraceItem> {
+    constexpr auto parse(format_parse_context &ctx) const noexcept {
+        return ctx.end();
+    }
+    template<typename FormatContext>
+    auto format(const luisa::TraceItem &item, FormatContext &ctx) const noexcept {
+        return luisa::format_to(ctx.out(), FMT_STRING("[0x{:012x}]: {} :: {} + {}"),
+                                item.address, item.module, item.symbol, item.offset);
+    }
+};
 
 }// namespace fmt
 

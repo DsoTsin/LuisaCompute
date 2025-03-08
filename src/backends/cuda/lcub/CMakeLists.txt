@@ -10,8 +10,7 @@ endif()
 file(GLOB_RECURSE DCUB_SOURCES CONFIGURE_DEPENDS "private/dcub/*.cu")
 add_library(luisa-compute-cuda-ext-dcub SHARED ${DCUB_SOURCES})
 target_compile_definitions(luisa-compute-cuda-ext-dcub PRIVATE DCUB_DLL_EXPORTS=1)
-target_link_libraries(luisa-compute-cuda-ext-dcub PUBLIC CUDA::cudart)
-target_include_directories(luisa-compute-cuda-ext-dcub PRIVATE "${CMAKE_SOURCE_DIR}/include") # -> LuisaCompute/include
+target_link_libraries(luisa-compute-cuda-ext-dcub PUBLIC CUDA::cudart luisa-compute-include)
 set_target_properties(luisa-compute-cuda-ext-dcub PROPERTIES OUTPUT_NAME "lc-cuda-dcub")
 install(TARGETS luisa-compute-cuda-ext-dcub EXPORT LuisaComputeTargets
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}

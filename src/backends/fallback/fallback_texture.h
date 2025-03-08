@@ -77,6 +77,32 @@ template<typename T, uint dim>
 }
 
 template<typename T, uint dim>
+[[nodiscard]] inline half4 pixel_to_half4(const std::byte *pixel) noexcept {
+    auto value = reinterpret_cast<const T *>(pixel);
+    if constexpr (dim == 1u) {
+        return luisa::make_half4(
+            static_cast<luisa::half>(scalar_to_float<T>(value[0])),
+            static_cast<luisa::half>(0.f),
+            static_cast<luisa::half>(0.f),
+            static_cast<luisa::half>(0.f));
+    } else if constexpr (dim == 2u) {
+        return luisa::make_half4(
+            static_cast<luisa::half>(scalar_to_float<T>(value[0])),
+            static_cast<luisa::half>(scalar_to_float<T>(value[1])),
+            static_cast<luisa::half>(0.f),
+            static_cast<luisa::half>(0.f));
+    } else if constexpr (dim == 4u) {
+        return luisa::make_half4(
+            static_cast<luisa::half>(scalar_to_float<T>(value[0])),
+            static_cast<luisa::half>(scalar_to_float<T>(value[1])),
+            static_cast<luisa::half>(scalar_to_float<T>(value[2])),
+            static_cast<luisa::half>(scalar_to_float<T>(value[3])));
+    } else {
+        return make_half4();
+    }
+}
+
+template<typename T, uint dim>
 inline void float4_to_pixel(std::byte *pixel, float4 v) noexcept {
     auto value = reinterpret_cast<T *>(pixel);
     if constexpr (dim == 1u) {
@@ -116,6 +142,31 @@ template<typename T, uint dim>
 }
 
 template<typename T, uint dim>
+[[nodiscard]] inline ubyte4 pixel_to_byte4(const std::byte *pixel) noexcept {
+    auto value = reinterpret_cast<const T *>(pixel);
+    if constexpr (dim == 1u) {
+        return make_ubyte4(
+            static_cast<uint8_t>(scalar_to_int<T>(value[0])),
+            0u,
+            0u,
+            0u);
+    } else if constexpr (dim == 2u) {
+        return make_ubyte4(
+            static_cast<uint8_t>(scalar_to_int<T>(value[0])),
+            static_cast<uint8_t>(scalar_to_int<T>(value[1])),
+            0u, 0u);
+    } else if constexpr (dim == 4u) {
+        return make_ubyte4(
+            static_cast<uint8_t>(scalar_to_int<T>(value[0])),
+            static_cast<uint8_t>(scalar_to_int<T>(value[1])),
+            static_cast<uint8_t>(scalar_to_int<T>(value[2])),
+            static_cast<uint8_t>(scalar_to_int<T>(value[3])));
+    } else {
+        return make_ubyte4();
+    }
+}
+
+template<typename T, uint dim>
 inline void int4_to_pixel(std::byte *pixel, uint4 v) noexcept {
     auto value = reinterpret_cast<T *>(pixel);
     if constexpr (dim == 1u) {
@@ -135,11 +186,14 @@ template<typename Dst, typename Src, uint dim>
 [[nodiscard]] inline auto read_pixel(const std::byte *p) noexcept {
     if constexpr (std::is_same_v<Dst, float>) {
         return pixel_to_float4<Src, dim>(p);
+    } else if constexpr (std::is_same_v<Dst, luisa::half>) {
+        return pixel_to_half4<Src, dim>(p);
+    } else if constexpr (std::is_same_v<Dst, int8_t> || std::is_same_v<Dst, char> || std::is_same_v<Dst, luisa::byte> ||
+                         std::is_same_v<Dst, uint8_t> || std::is_same_v<Dst, luisa::uchar> || std::is_same_v<Dst, luisa::ubyte>) {
+        return luisa::bit_cast<Vector<Dst, 4u>>(pixel_to_byte4<Src, dim>(p));
     } else {
-        static_assert(std::is_same_v<Dst, int> ||
-                      std::is_same_v<Dst, uint>);
-        return luisa::bit_cast<Vector<Dst, 4u>>(
-            pixel_to_int4<Src, dim>(p));
+        static_assert(std::is_same_v<Dst, int> || std::is_same_v<Dst, uint>);
+        return luisa::bit_cast<Vector<Dst, 4u>>(pixel_to_int4<Src, dim>(p));
     }
 }
 

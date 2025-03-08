@@ -163,10 +163,14 @@ test_proj("test_imgui", true, function()
     add_deps("imgui")
 end)
 test_proj("test_zip", false, function()
-    add_packages("zlib", {
-        public = false,
-        inherit = false
-    })
+    if get_config("lc_xrepo_dir") then
+        add_packages("zlib", {
+            public = false,
+            inherit = false
+        })
+    else
+        add_deps("zlib")
+    end
 end)
 if get_config("dx_backend") then
     test_proj("test_raster", true)

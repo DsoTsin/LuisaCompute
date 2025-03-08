@@ -39,7 +39,14 @@ struct DirectXDeviceConfigExt : public DeviceConfigExt {
         IDXGIFactory2 *factory;
     };
 
+    struct GPUAllocatorSettings {
+        size_t preferred_block_size;
+        size_t sparse_buffer_block_size;
+        size_t sparse_image_block_size;
+    };
+
     virtual luisa::optional<ExternalDevice> CreateExternalDevice() noexcept { return {}; }
+    virtual luisa::optional<GPUAllocatorSettings> GetGPUAllocatorSettings() noexcept { return {}; }
     // Called during create_device
     virtual void ReadbackDX12Device(
         ID3D12Device *device,
@@ -48,7 +55,7 @@ struct DirectXDeviceConfigExt : public DeviceConfigExt {
         DirectXFuncTable const *funcTable,
         luisa::BinaryIO const *shaderIo,
         IDxcCompiler3 *dxcCompiler,
-        IDxcLibrary* dxcLibrary,
+        IDxcLibrary *dxcLibrary,
         IDxcUtils *dxcUtils,
         ID3D12DescriptorHeap *shaderDescriptor,
         ID3D12DescriptorHeap *samplerDescriptor) noexcept {}

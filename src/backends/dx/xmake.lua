@@ -12,6 +12,18 @@ if is_plat("windows") then
     add_defines("UNICODE", "_CRT_SECURE_NO_WARNINGS")
 end
 on_load(function(target)
+    if get_config("enable_win_pix") then
+        target:add("linkdirs", target:targetdir())
+        target:add("links", "WinPixEventRuntime")
+        target:add("defines", "LCDX_ENABLE_WINPIX")
+    end
+    if get_config("lc_backend_lto") then
+        target:set("policy", "build.optimization.lto", true)
+        if get_config("lc_toolchain") == "llvm" then
+            target:add("ldflags", "-fuse-ld=lld-link")
+            target:add("shflags", "-fuse-ld=lld-link")
+        end
+    end
     if get_config("dx_cuda_interop") then
         local cuda_path = os.getenv("CUDA_PATH")
         if not cuda_path then
@@ -29,8 +41,12 @@ set_pcxxheader("pch.h")
 add_rules('lc_install_sdk', {
     libnames = {'dx_sdk'}
 })
-add_packages("zlib", {
-    public = false,
-    inherit = false
-})
+if get_config("lc_xrepo_dir") then
+    add_packages("zlib", {
+        public = false,
+        inherit = false
+    })
+else
+    add_deps("zlib")
+end
 target_end()

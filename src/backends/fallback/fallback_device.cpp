@@ -23,13 +23,18 @@
 #include "fallback_device.h"
 #include "fallback_texture.h"
 #include "fallback_mesh.h"
+#include "fallback_curve.h"
 #include "fallback_proc_prim.h"
+#include "fallback_motion_instance.h"
 #include "fallback_accel.h"
 #include "fallback_bindless_array.h"
 #include "fallback_shader.h"
 #include "fallback_buffer.h"
 #include "fallback_event.h"
 #include "fallback_swapchain.h"
+
+// extensions
+#include "fallback_tex_compress.h"
 
 namespace luisa::compute::fallback {
 
@@ -74,7 +79,7 @@ void *FallbackDevice::native_handle() const noexcept {
 }
 
 void FallbackDevice::destroy_buffer(uint64_t handle) noexcept {
-    luisa::deallocate_with_allocator(reinterpret_cast<FallbackBuffer *>(handle));
+    luisa::delete_with_allocator(reinterpret_cast<FallbackBuffer *>(handle));
 }
 
 void FallbackDevice::destroy_texture(uint64_t handle) noexcept {
@@ -110,7 +115,7 @@ void FallbackDevice::destroy_accel(uint64_t handle) noexcept {
 }
 
 void FallbackDevice::destroy_swap_chain(uint64_t handle) noexcept {
-    luisa::deallocate_with_allocator(reinterpret_cast<FallbackSwapchain *>(handle));
+    luisa::delete_with_allocator(reinterpret_cast<FallbackSwapchain *>(handle));
 }
 
 void FallbackDevice::present_display_in_stream(uint64_t stream_handle,
@@ -251,19 +256,24 @@ void FallbackDevice::destroy_procedural_primitive(uint64_t handle) noexcept {
 }
 
 ResourceCreationInfo FallbackDevice::create_curve(const AccelOption &option) noexcept {
-    return DeviceInterface::create_curve(option);
+    auto curve = luisa::new_with_allocator<FallbackCurve>(_rtc_device, option);
+    return {.handle = reinterpret_cast<uint64_t>(curve),
+            .native_handle = curve->handle()};
 }
 
 void FallbackDevice::destroy_curve(uint64_t handle) noexcept {
-    DeviceInterface::destroy_curve(handle);
+    auto curve = reinterpret_cast<FallbackCurve *>(handle);
+    luisa::delete_with_allocator(curve);
 }
 
 ResourceCreationInfo FallbackDevice::create_motion_instance(const AccelMotionOption &option) noexcept {
-    return DeviceInterface::create_motion_instance(option);
+    auto instance = luisa::new_with_allocator<FallbackMotionInstance>(option);
+    return {.handle = reinterpret_cast<uint64_t>(instance), .native_handle = instance};
 }
 
 void FallbackDevice::destroy_motion_instance(uint64_t handle) noexcept {
-    DeviceInterface::destroy_motion_instance(handle);
+    auto instance = reinterpret_cast<FallbackMotionInstance *>(handle);
+    luisa::delete_with_allocator(instance);
 }
 
 ResourceCreationInfo FallbackDevice::create_accel(const AccelOption &option) noexcept {
@@ -277,6 +287,11 @@ string FallbackDevice::query(luisa::string_view property) noexcept {
 }
 
 DeviceExtension *FallbackDevice::extension(luisa::string_view name) noexcept {
+    if (name == TexCompressExt::name) {
+        std::scoped_lock lock{_ext_mutex};
+        if (_tex_compress_ext == nullptr) { _tex_compress_ext = create_fallback_tex_compress_ext(); }
+        return _tex_compress_ext.get();
+    }
     return DeviceInterface::extension(name);
 }
 

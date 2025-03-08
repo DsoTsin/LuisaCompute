@@ -59,6 +59,7 @@ set(LUISA_COMPUTE_XIR_SOURCES
         passes/helpers.cpp
         passes/dce.cpp
         passes/dom_tree.cpp
+        passes/call_graph.cpp
         passes/outline.cpp
         passes/sroa.cpp
         passes/trace_gep.cpp
@@ -73,6 +74,7 @@ set(LUISA_COMPUTE_XIR_SOURCES
         passes/transpose_gep.cpp
         passes/unused_callable_removal.cpp
         passes/reg2mem.cpp
+        passes/promote_ref_arg.cpp
 )
 
 add_library(luisa-compute-xir SHARED ${LUISA_COMPUTE_XIR_SOURCES})

@@ -40,7 +40,6 @@ private:
     kernel_entry_t *_kernel_entry{nullptr};
     size_t _argument_buffer_size{};
     size_t _shared_memory_size{};
-    luisa::unique_ptr<llvm::Module> _module{};
     luisa::vector<ShaderDispatchCommand::Argument> _bound_arguments;
     luisa::vector<luisa::unique_ptr<ShaderPrintFormatter>> _print_formatters;
 

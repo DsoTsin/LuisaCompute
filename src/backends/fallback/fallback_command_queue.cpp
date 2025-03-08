@@ -1,67 +1,154 @@
 #include "fallback_command_queue.h"
 
-#ifdef LUISA_FALLBACK_USE_AKR_THREAD_POOL
-
-#include <barrier>
-#include <optional>
 #include <luisa/core/stl/vector.h>
 #include <luisa/vstl/unique_ptr.h>
+#include <luisa/core/logging.h>
+
+#ifdef LUISA_FALLBACK_USE_AKARI_THREAD_POOL
+
+#include <optional>
+#ifdef LUISA_PLATFORM_WINDOWS
+#include <windows.h>
+#else
+#include <pthread.h>
+#endif
 
 namespace luisa::compute::fallback {
 
-struct AkrThreadPool {
-    luisa::vector<luisa::unique_ptr<std::thread>> _threads;
+struct Thread {
+
+#ifdef LUISA_PLATFORM_WINDOWS
+    HANDLE handle{};
+#else
+    pthread_t handle{};
+#endif
+    luisa::move_only_function<void()> f;
+
+    static constexpr auto STACK_SIZE = 4_M;
+
+    template<class F>
+    explicit Thread(uint tid [[maybe_unused]], F &&f) noexcept : f{std::forward<F>(f)} {
+
+#ifdef LUISA_PLATFORM_WINDOWS
+        handle = CreateThread(nullptr, STACK_SIZE, [](void *arg) -> DWORD {
+            auto *f = static_cast<luisa::move_only_function<void()> *>(arg);
+            (*f)();
+            return 0; }, &this->f, 0, nullptr);
+        if (handle == nullptr) {
+            LUISA_ERROR_WITH_LOCATION("Failed to create thread");
+        }
+        auto thread_group = tid / 64;
+        GROUP_AFFINITY affinity{};
+        affinity.Group = static_cast<WORD>(thread_group);
+        affinity.Mask = 1ull << (tid % 64);
+        if (SetThreadGroupAffinity(handle, &affinity, nullptr) == 0) {
+            LUISA_WARNING_WITH_LOCATION("Failed to pin thread to group");
+        }
+#else
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setstacksize(&attr, STACK_SIZE);
+#ifdef LUISA_PLATFORM_APPLE
+        pthread_attr_set_qos_class_np(&attr, QOS_CLASS_USER_INTERACTIVE, 0);
+#endif
+        if (pthread_create(&handle, &attr, [](void *arg) noexcept -> void * {
+            auto *f = static_cast<luisa::move_only_function<void()> *>(arg);
+            (*f)();
+            return nullptr; }, &this->f) != 0) {
+            LUISA_ERROR_WITH_LOCATION("Failed to create thread");
+        }
+        pthread_attr_destroy(&attr);
+#if !defined(LUISA_PLATFORM_APPLE)
+        cpu_set_t cpuset;
+        CPU_ZERO(&cpuset);
+        CPU_SET(tid, &cpuset);
+        if (pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset) != 0) {
+            LUISA_WARNING_WITH_LOCATION("Failed to create thread");
+        }
+#endif
+#endif
+    }
+    Thread(const Thread &) = delete;
+    Thread(Thread &&) = delete;
+    Thread &operator=(const Thread &) = delete;
+    Thread &operator=(Thread &&) = delete;
+
+    ~Thread() noexcept {
+#ifdef LUISA_PLATFORM_WINDOWS
+        WaitForSingleObject(handle, INFINITE);
+        CloseHandle(handle);
+#else
+        pthread_join(handle, nullptr);
+#endif
+    }
+};
+
+class AkrThreadPool {
+
+public:
+    struct alignas(64) ParallelFor {
+        uint count = 0u;
+        uint block_size = 0u;
+        luisa::move_only_function<void(uint)> *task = nullptr;
+    };
+
+private:
+    luisa::vector<luisa::unique_ptr<Thread>> _threads;
     std::mutex _task_mutex, _submit_mutex;
     std::condition_variable _has_work, _work_done;
-    std::barrier<> _barrier;
-    std::atomic_uint32_t _item_count = 0u;
-    struct ParallelFor {
-        uint count;
-        uint block_size;
-        luisa::move_only_function<void(uint)> task{};
-    };
-    std::optional<ParallelFor> _parallel_for;
-    std::atomic_bool _stopped = false;
-    explicit AkrThreadPool(size_t n_threads) : _barrier(static_cast<std::ptrdiff_t>(n_threads)) {
-        for (size_t tid = 0; tid < n_threads; tid++) {
-            _threads.emplace_back(std::move(luisa::make_unique<std::thread>([this, tid] {
-                while (!_stopped.load(std::memory_order_relaxed)) {
+    ParallelFor _parallel_for = {};
 
+#ifdef __cpp_lib_hardware_interference_size
+    static constexpr auto cache_line_size = std::hardware_destructive_interference_size;
+#else
+    static constexpr auto cache_line_size = 64u;
+#endif
+    alignas(cache_line_size) std::atomic_uint32_t _item_count = 0u;
+    alignas(cache_line_size) std::atomic_uint64_t _task_generation = 0u;
+
+    std::atomic_uint32_t _thread_working;
+    std::atomic_bool _stopped = false;
+
+public:
+    explicit AkrThreadPool(size_t n_threads) noexcept {
+        for (size_t tid = 0; tid < n_threads; tid++) {
+            _threads.emplace_back(std::move(luisa::make_unique<Thread>(tid, [this] {
+                auto last_task_generation = 0;
+                while (!_stopped.load(std::memory_order_seq_cst)) {
                     std::unique_lock lock{_task_mutex};
-                    _has_work.wait(lock, [this] { return _parallel_for.has_value() || _stopped.load(std::memory_order_relaxed); });
-                    if (_stopped.load(std::memory_order_relaxed)) { return; }
-                    auto &&[count, block_size, task] = *_parallel_for;
+                    _has_work.wait(lock, [this, &last_task_generation] { return (last_task_generation != _task_generation.load() && _parallel_for.task != nullptr) || _stopped.load(std::memory_order_seq_cst); });
+                    if (_stopped.load(std::memory_order_seq_cst)) { return; }
+                    last_task_generation = _task_generation.load(std::memory_order_seq_cst);
+                    auto [count, block_size, task] = _parallel_for;
                     lock.unlock();
                     while (_item_count < count) {
-                        auto i = _item_count.fetch_add(block_size, std::memory_order_relaxed);
+                        auto i = _item_count.fetch_add(block_size, std::memory_order_seq_cst);
                         for (uint j = i; j < std::min<uint>(i + block_size, count); j++) {
-                            task(j);
+                            (*task)(j);
                         }
                     }
-                    _barrier.arrive_and_wait();
-                    if (tid == 0) {
+                    if (_thread_working.fetch_sub(1, std::memory_order_seq_cst) == 1) {
                         _work_done.notify_all();
                     }
-                    _barrier.arrive_and_wait();
                 }
             })));
         }
     }
-    void parallel_for(uint count, luisa::move_only_function<void(uint)> &&task) {
+    ~AkrThreadPool() noexcept {
+        _stopped.store(true, std::memory_order_seq_cst);
+        _has_work.notify_all();
+        _threads.clear();
+    }
+    void parallel_for(uint count, luisa::move_only_function<void(uint)> &&task) noexcept {
         std::scoped_lock _lk{_submit_mutex};
         std::unique_lock lock{_task_mutex};
-        _parallel_for = ParallelFor{count, 1u, std::move(task)};
+        _thread_working.store(_threads.size(), std::memory_order_seq_cst);
+        _parallel_for = {count, 1u, &task};
         _item_count.store(0, std::memory_order_seq_cst);
+        _task_generation.fetch_add(1, std::memory_order_seq_cst);
         _has_work.notify_all();
-        _work_done.wait(lock, [this] { return _item_count.load(std::memory_order_relaxed) >= _parallel_for->count; });
-        _parallel_for.reset();
-    }
-    ~AkrThreadPool() {
-        _stopped.store(true, std::memory_order_relaxed);
-        _has_work.notify_all();
-        for (auto &&thread : _threads) {
-            thread->join();
-        }
+        _work_done.wait(lock, [this] { return _thread_working.load(std::memory_order_seq_cst) == 0; });
+        _parallel_for = {};
     }
 };
 
@@ -92,10 +179,8 @@ inline void FallbackCommandQueue::_run_dispatch_loop() noexcept {
     if (_dispatch_queue != nullptr) {
         dispatch_release(_dispatch_queue);
     }
-#elif defined(LUISA_FALLBACK_USE_AKR_THREAD_POOL)
-    if (_worker_pool != nullptr) {
-        luisa::delete_with_allocator(_worker_pool);
-    }
+#elif defined(LUISA_FALLBACK_USE_AKARI_THREAD_POOL)
+    _worker_pool.reset();
 #endif
 }
 
@@ -167,9 +252,9 @@ void FallbackCommandQueue::enqueue_parallel(uint n, luisa::move_only_function<vo
         concurrency::parallel_for(0u, n, task);
 #elif defined(LUISA_FALLBACK_USE_TBB)
         tbb::parallel_for(0u, n, task);
-#elif defined(LUISA_FALLBACK_USE_AKR_THREAD_POOL)
+#elif defined(LUISA_FALLBACK_USE_AKARI_THREAD_POOL)
         if (_worker_pool == nullptr) {
-            _worker_pool = luisa::new_with_allocator<AkrThreadPool>(_worker_count);
+            _worker_pool = luisa::make_unique<AkrThreadPool>(_worker_count);
         }
         _worker_pool->parallel_for(n, std::move(task));
 #endif

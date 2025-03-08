@@ -2,6 +2,7 @@
 #include <Resource/DescriptorHeap.h>
 #include <luisa/core/logging.h>
 #include "SparseHeap.h"
+#include <DXRuntime/UpdateTileTracker.h>
 namespace lc::dx {
 SparseTexture::SparseTexture(
     Device *device,
@@ -65,7 +66,7 @@ uint SparseTexture::GetGlobalSRVIndex(uint mipOffset) const {
 uint SparseTexture::GetGlobalUAVIndex(uint mipLevel) const {
     return GetGlobalUAVIndexBase(mipLevel, allocMtx, uavIdcs);
 }
-void SparseTexture::AllocateTile(ID3D12CommandQueue *queue, uint3 coord, uint3 size, uint mipLevel, uint64 alloc) const {
+void SparseTexture::AllocateTile(uint3 coord, uint3 size, uint mipLevel, uint64 alloc, UpdateTileTracker *tile_tracker) const {
     auto heap = reinterpret_cast<SparseHeap const *>(alloc);
     if (heap->size_bytes < (size.x * size.y * size.z) * D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES) [[unlikely]] {
         LUISA_ERROR("Map size out of range. Required size: {}, heap size: {}", (size.x * size.y * size.z) * D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES, heap->size_bytes);
@@ -83,17 +84,9 @@ void SparseTexture::AllocateTile(ID3D12CommandQueue *queue, uint3 coord, uint3 s
         .Depth = static_cast<uint16_t>(size.z)};
     uint rangeTileCount = tileSize.NumTiles;
     uint offsetTile = heap->offset / D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES;
-    queue->UpdateTileMappings(
-        resource.Get(), 1,
-        &tileCoord,
-        &tileSize,
-        heap->heap, 1,
-        vstd::get_rval_ptr(D3D12_TILE_RANGE_FLAG_NONE),
-        &offsetTile,
-        &rangeTileCount,
-        D3D12_TILE_MAPPING_FLAG_NONE);
+    tile_tracker->record(heap->heap, resource.Get(), tileCoord, tileSize, D3D12_TILE_RANGE_FLAG_NONE, offsetTile, rangeTileCount);
 }
-void SparseTexture::DeAllocateTile(ID3D12CommandQueue *queue, uint3 coord, uint3 size, uint mipLevel) const {
+void SparseTexture::DeAllocateTile(uint3 coord, uint3 size, uint mipLevel, UpdateTileTracker *tile_tracker) const {
     D3D12_TILED_RESOURCE_COORDINATE tileCoord{
         .X = coord.x,
         .Y = coord.y,
@@ -105,13 +98,6 @@ void SparseTexture::DeAllocateTile(ID3D12CommandQueue *queue, uint3 coord, uint3
         .Width = size.x,
         .Height = static_cast<uint16_t>(size.y),
         .Depth = static_cast<uint16_t>(size.z)};
-    queue->UpdateTileMappings(
-        resource.Get(), 1, &tileCoord,
-        &tileSize,
-        nullptr, 1,
-        vstd::get_rval_ptr(D3D12_TILE_RANGE_FLAG_NULL),
-        nullptr,
-        nullptr,
-        D3D12_TILE_MAPPING_FLAG_NONE);
+    tile_tracker->deallocate(resource.Get(), tileCoord, tileSize);
 }
 }// namespace lc::dx

@@ -38,7 +38,19 @@ set_values(true, false)
 set_default(false)
 set_showmenu(true)
 option_end()
+
+option("enable_win_pix")
+set_values(true, false)
+set_default(false)
+set_showmenu(true)
+option_end()
+
 -- enable Vulkan backend
+option("vk_support")
+set_values(true, false)
+set_default(true)
+set_showmenu(true)
+option_end()
 option("vk_backend")
 set_values(true, false)
 -- TODO: vulkan backend not ready
@@ -170,6 +182,12 @@ set_default(false)
 set_showmenu(true)
 option_end()
 
+option("lc_backend_lto")
+set_values(true, false)
+set_default(false)
+set_showmenu(true)
+option_end()
+
 option("llvm_path")
 set_default(false)
 set_showmenu(true)
@@ -180,23 +198,35 @@ set_default(false)
 set_showmenu(true)
 option_end()
 
--- pre-defined options end
+option("lc_xrepo_dir")
+set_default(false)
+set_showmenu(true)
+option_end()
 
--- use xrepo from skr
-add_repositories("skr-xrepo xrepo", {
-    rootdir = os.projectdir()
-})
+-- pre-defined options end
 -- try options.lua
 if path.absolute(os.projectdir()) == path.absolute(os.scriptdir()) and os.exists("scripts/options.lua") then
     includes("scripts/options.lua")
 end
-if lc_toolchain then
-    for k, v in pairs(lc_toolchain) do
+if lc_options then
+    for k, v in pairs(lc_options) do
         set_config(k, v)
     end
 end
 includes("scripts/xmake_func.lua")
 
+-- use xrepo from skr
+local xrepo_path = get_config("lc_xrepo_dir")
+if not xrepo_path then
+    includes("xrepo/packages/z/zlib/port/xmake.lua")
+elseif type(xrepo_path) == "string" and os.exists(xrepo_path) then
+    add_repositories("skr-xrepo xrepo", {
+        rootdir = xrepo_path
+    })
+    add_requires("zlib >=1.2.8-skr", {
+        system = false
+    })
+end
 if get_config('_lc_check_env') then
     local bin_dir = get_config("_lc_bin_dir")
     if bin_dir then

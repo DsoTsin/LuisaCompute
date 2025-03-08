@@ -1133,22 +1133,30 @@ void MetalCodegenAST::visit(const CallExpr *expr) noexcept {
         case CallOp::RAY_TRACING_QUERY_ALL_MOTION_BLUR: _scratch << "accel_query_all_motion_blur"; break;
         case CallOp::RAY_TRACING_QUERY_ANY_MOTION_BLUR: _scratch << "accel_query_all_motion_blur"; break;
 
-        case CallOp::TEXTURE2D_SAMPLE: LUISA_NOT_IMPLEMENTED();
-        case CallOp::TEXTURE2D_SAMPLE_LEVEL: LUISA_NOT_IMPLEMENTED();
-        case CallOp::TEXTURE2D_SAMPLE_GRAD: LUISA_NOT_IMPLEMENTED();
-        case CallOp::TEXTURE2D_SAMPLE_GRAD_LEVEL: LUISA_NOT_IMPLEMENTED();
-        case CallOp::TEXTURE3D_SAMPLE: LUISA_NOT_IMPLEMENTED();
-        case CallOp::TEXTURE3D_SAMPLE_LEVEL: LUISA_NOT_IMPLEMENTED();
-        case CallOp::TEXTURE3D_SAMPLE_GRAD: LUISA_NOT_IMPLEMENTED();
-        case CallOp::TEXTURE3D_SAMPLE_GRAD_LEVEL: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_SAMPLER: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_LEVEL_SAMPLER: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_SAMPLER: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_LEVEL_SAMPLER: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_SAMPLER: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_LEVEL_SAMPLER: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_SAMPLER: LUISA_NOT_IMPLEMENTED();
-        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_LEVEL_SAMPLER: LUISA_NOT_IMPLEMENTED();
+        case CallOp::TEXTURE2D_SAMPLE:
+        case CallOp::TEXTURE3D_SAMPLE:
+            _scratch << "texture_sample";
+            break;
+        case CallOp::TEXTURE2D_SAMPLE_LEVEL:
+        case CallOp::TEXTURE3D_SAMPLE_LEVEL:
+            _scratch << "texture_sample_level";
+            break;
+        case CallOp::TEXTURE2D_SAMPLE_GRAD:
+        case CallOp::TEXTURE3D_SAMPLE_GRAD:
+            _scratch << "texture_sample_grad";
+            break;
+        case CallOp::TEXTURE2D_SAMPLE_GRAD_LEVEL:
+        case CallOp::TEXTURE3D_SAMPLE_GRAD_LEVEL:
+            _scratch << "texture_sample_grad_level";
+            break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_SAMPLER: _scratch << "bindless_texture_sample2d_sample"; break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_LEVEL_SAMPLER: _scratch << "bindless_texture_sample2d_level_sample"; break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_SAMPLER: _scratch << "bindless_texture_sample2d_grad_sample"; break;
+        case CallOp::BINDLESS_TEXTURE2D_SAMPLE_GRAD_LEVEL_SAMPLER: _scratch << "bindless_texture_sample2d_grad_level_sample"; break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_SAMPLER: _scratch << "bindless_texture_sample3d_sample"; break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_LEVEL_SAMPLER: _scratch << "bindless_texture_sample3d_level_sample"; break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_SAMPLER: _scratch << "bindless_texture_sample3d_grad_sample"; break;
+        case CallOp::BINDLESS_TEXTURE3D_SAMPLE_GRAD_LEVEL_SAMPLER: _scratch << "bindless_texture_sample3d_grad_level_sample"; break;
         case CallOp::CLOCK: LUISA_NOT_IMPLEMENTED();
     }
     _scratch << "(";
