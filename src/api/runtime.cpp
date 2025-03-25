@@ -5,10 +5,22 @@
 #include <luisa/runtime/rtx/triangle.h>
 #include <luisa/runtime/rtx/aabb.h>
 #include <luisa/api/api.h>
-#include <luisa/core/forget.h>
 #include <luisa/backends/ext/denoiser_ext.h>
 #include <utility>
-
+namespace luisa {
+/// @brief  forget a value. similar to std::mem::forget in rust.
+template<typename T>
+    requires std::is_rvalue_reference_v<T &&>
+void forget(T &&value) noexcept {
+    struct AlignedStorage {
+        alignas(T) std::byte _[sizeof(T)];
+    };
+    static_assert(sizeof(AlignedStorage) == sizeof(T));
+    static_assert(alignof(AlignedStorage) == alignof(T));
+    AlignedStorage s{};
+    new (s._) T{std::move(value)};
+}
+}// namespace luisa
 #define LUISA_RC_TOMBSTONE 0xdeadbeef
 
 // TODO: rewrite with runtime constructs, e.g., Stream, Event, BindlessArray...

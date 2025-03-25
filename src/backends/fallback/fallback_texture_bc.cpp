@@ -771,12 +771,12 @@ void BC7Block::Decode(int x, int y, float *out) const noexcept {
 		}
 
 		for (unsigned i = 0; i < uNumEndPts; i++) {
-#ifdef __GNUC__
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-overflow"
 #endif
 			c[i] = Unquantize(c[i], RGBAPrecWithP);
-#ifdef __GNUC_
+#if defined(__GNUC_) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
 		}

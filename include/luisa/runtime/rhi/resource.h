@@ -196,6 +196,7 @@ public:
         SPARSE_TEXTURE,
         SPARSE_BUFFER_HEAP,
         SPARSE_TEXTURE_HEAP,
+        TENSOR_GRAPH
     };
 
 private:
@@ -223,9 +224,8 @@ protected:
                           "Resource::_move_from can only be used in derived classes");
             auto self = static_cast<Self *>(this);
             // destroy the old resource
-            self->~Self();
-            // move the new resource
-            new (std::launder(self)) Self{static_cast<Self &&>(rhs)};
+            std::destroy_at(self);
+            std::construct_at(self, std::move(rhs));
         }
     }
 

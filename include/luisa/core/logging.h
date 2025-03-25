@@ -60,9 +60,12 @@ void log_warning(Args &&...args) noexcept {
 
 template<typename... Args>
 [[noreturn]] LUISA_FORCE_INLINE void log_error(Args &&...args) noexcept {
-    auto error_message = sizeof...(args) == 1u ?
-                             std::string{std::forward<Args>(args)...} /* note: this must be std::string */ :
-                             fmt::format(std::forward<Args>(args)...);
+    std::string error_message;
+    if constexpr(sizeof...(args) == 1u) {
+        error_message = std::string{std::forward<Args>(args)...};
+    } else {
+        error_message = fmt::format(std::forward<Args>(args)...);
+    }
     auto trace = luisa::backtrace();
     for (auto i = 0u; i < trace.size(); i++) {
         auto &&t = trace[i];

@@ -2,7 +2,7 @@
 
 #include <type_traits>
 
-#if defined(_MSC_VER)
+#if !defined(LUISA_USE_SYSTEM_STL) && defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable : 4996)
 #endif
@@ -22,6 +22,9 @@ namespace luisa {
 
 using fmt::format_to;
 
+#ifdef LUISA_USE_SYSTEM_STL
+using fmt::format;
+#else
 template<typename String, typename Format, typename... Args>
 [[nodiscard]] inline auto format(Format &&f, Args &&...args) noexcept {
     using char_type = typename String::value_type;
@@ -30,11 +33,11 @@ template<typename String, typename Format, typename... Args>
     luisa::format_to(std::back_inserter(buffer), std::forward<Format>(f), std::forward<Args>(args)...);
     return String{buffer.data(), buffer.size()};
 }
-
 template<typename Format, typename... Args>
 [[nodiscard]] inline auto format(Format &&f, Args &&...args) noexcept {
     return format<luisa::string>(std::forward<Format>(f), std::forward<Args>(args)...);
 }
+#endif
 
 [[nodiscard]] inline auto hash_to_string(uint64_t hash) noexcept {
     return luisa::format(FMT_STRING("{:016X}"), hash);
@@ -166,6 +169,6 @@ template<typename T, size_t N>
 
 }// namespace luisa
 
-#if defined(_MSC_VER)
+#if !defined(LUISA_USE_SYSTEM_STL) && defined(_MSC_VER)
 #pragma warning(pop)
 #endif

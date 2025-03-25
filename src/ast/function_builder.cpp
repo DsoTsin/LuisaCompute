@@ -1021,15 +1021,15 @@ const Expression *FunctionBuilder::_internalize(const Expression *expr) noexcept
             return expr;
         };
         auto internalize_rvalue = [this, external, mark_internalizer_argument] {
-            auto src = std::find(stack().crbegin(), stack().crend(), external->builder());
-            LUISA_ASSERT(src != stack().crend(),
+            auto src = std::find(stack().rbegin(), stack().rend(), external->builder());
+            LUISA_ASSERT(src != stack().rend(),
                          "Cannot internalize r-value expression "
                          "that is not on the stack.");
             return mark_internalizer_argument(argument(external->type()));
         };
         auto internalize_lvalue = [this, external, mark_internalizer_argument] {
-            auto src = std::find(stack().crbegin(), stack().crend(), external->builder());
-            auto on_stack = src != stack().crend();
+            auto src = std::find(stack().rbegin(), stack().rend(), external->builder());
+            auto on_stack = src != stack().rend();
             // if the external expression is not on the stack, we defer
             // the internalization until the full kernel is encoded
             if (!on_stack) {

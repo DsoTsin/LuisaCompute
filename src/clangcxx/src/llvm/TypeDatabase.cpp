@@ -306,6 +306,7 @@ const luisa::compute::Type *TypeDatabase::RecordAsBuiltinType(const QualType Ty)
             clangcxx_log_error("unsupported type: {}, kind {}, N {}", Ty.getAsString(), luisa::to_string(EType->getKind()), N);    \
         } break;                                                                                               \
     }
+                            case (BuiltinType::Kind::Half): { CASE_VEC_TYPE(half) } break;
                             case (BuiltinType::Kind::Bool): { CASE_VEC_TYPE(bool) } break;
                             case (BuiltinType::Kind::Float): { CASE_VEC_TYPE(float) } break;
                             case (BuiltinType::Kind::Long): { CASE_VEC_TYPE(slong) } break;

@@ -9,7 +9,7 @@ struct unique_ptr_deleter {
         if constexpr (std::is_base_of_v<IDisposable, T>) {
             ptr->Dispose();
         } else {
-            vstd::destruct(ptr);
+            std::destroy_at(ptr);
             vengine_free(ptr);
         }
     }

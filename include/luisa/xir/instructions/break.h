@@ -8,7 +8,7 @@ namespace luisa::compute::xir {
 class LC_XIR_API BreakInst final : public DerivedBranchInstruction<BreakInst, DerivedInstructionTag::BREAK> {
 public:
     using Super::Super;
-    [[nodiscard]] BreakInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] BreakInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

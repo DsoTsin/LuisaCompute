@@ -6,6 +6,10 @@
 #include <luisa/core/concepts.h>
 #include <luisa/ast/attribute.h>
 
+namespace luisa {
+class MemorySanitizer;
+}// namespace luisa
+
 namespace luisa::compute {
 
 template<typename T>
@@ -280,6 +284,8 @@ struct TypeVisitor {
 
 /// Type class
 class LC_AST_API Type {
+    friend class ::luisa::MemorySanitizer;
+    static void reset_type_registry() noexcept;
 
 public:
     /// Type tags

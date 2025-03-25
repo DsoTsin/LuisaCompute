@@ -20,7 +20,7 @@ ShaderDispatchCmdEncoder::ShaderDispatchCmdEncoder(
     : _handle{handle}, _argument_count{arg_count} {
     if (auto arg_size_bytes = arg_count * sizeof(Argument)) {
         _argument_buffer.reserve(arg_size_bytes + uniform_size);
-        _argument_buffer.resize_uninitialized(arg_size_bytes);
+        luisa::vector_resize(_argument_buffer, arg_size_bytes);
     }
 }
 
@@ -44,7 +44,7 @@ void ShaderDispatchCmdEncoder::encode_texture(uint64_t handle, uint32_t level) n
 
 void ShaderDispatchCmdEncoder::encode_uniform(const void *data, size_t size) noexcept {
     auto offset = _argument_buffer.size();
-    _argument_buffer.push_back_uninitialized(size);
+    luisa::enlarge_by(_argument_buffer, size);
     std::memcpy(_argument_buffer.data() + offset, data, size);
     auto &&arg = _create_argument();
     arg.tag = Argument::Tag::UNIFORM;
@@ -57,7 +57,7 @@ void ComputeDispatchCmdEncoder::set_dispatch_size(uint3 launch_size) noexcept {
 }
 void ComputeDispatchCmdEncoder::set_dispatch_sizes(luisa::span<const uint3> sizes) noexcept {
     luisa::vector<uint3> vec;
-    vec.push_back_uninitialized(sizes.size());
+    luisa::enlarge_by(vec, sizes.size());
     std::memcpy(vec.data(), sizes.data(), sizes.size_bytes());
     _dispatch_size = std::move(vec);
 }
@@ -80,7 +80,7 @@ void ShaderDispatchCmdEncoder::encode_accel(uint64_t handle) noexcept {
 
 size_t ShaderDispatchCmdEncoder::compute_uniform_size(luisa::span<const Variable> arguments) noexcept {
     return std::accumulate(
-        arguments.cbegin(), arguments.cend(),
+        arguments.begin(), arguments.end(),
         static_cast<size_t>(0u), [](auto size, auto arg) noexcept {
             auto arg_type = arg.type();
             // Do not allocate redundant uniform buffer
@@ -90,7 +90,7 @@ size_t ShaderDispatchCmdEncoder::compute_uniform_size(luisa::span<const Variable
 
 size_t ShaderDispatchCmdEncoder::compute_uniform_size(luisa::span<const Type *const> arg_types) noexcept {
     return std::accumulate(
-        arg_types.cbegin(), arg_types.cend(),
+        arg_types.begin(), arg_types.end(),
         static_cast<size_t>(0u), [](auto size, auto arg_type) noexcept {
             LUISA_ASSERT(arg_type != nullptr, "Invalid argument type.");
             // Do not allocate redundant uniform buffer

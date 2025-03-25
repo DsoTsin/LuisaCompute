@@ -5,7 +5,7 @@
 
 namespace luisa::compute::xir {
 
-IfInst *IfInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+IfInst *IfInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_cond = resolver.resolve(condition());
     auto cloned = b.if_(resolved_cond);
     auto resolved_true_block = resolver.resolve(true_block());

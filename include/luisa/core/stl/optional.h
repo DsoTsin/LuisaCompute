@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef LUISA_USE_SYSTEM_STL
+#include <optional>
+#else
+
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -21,12 +25,20 @@
 #pragma warning(pop)
 #endif
 
+#endif
+
 namespace luisa {
 
+#ifdef LUISA_USE_SYSTEM_STL
+using std::make_optional;
+using std::nullopt;
+using std::nullopt_t;
+using std::optional;
+#else
 using eastl::make_optional;
 using eastl::nullopt;
 using eastl::nullopt_t;
 using eastl::optional;
+#endif
 
 }// namespace luisa
-

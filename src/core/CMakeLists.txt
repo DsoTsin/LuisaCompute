@@ -27,9 +27,12 @@ target_link_libraries(luisa-compute-core
         ${CMAKE_DL_LIBS}
         $<$<PLATFORM_ID:Windows>:dbghelp>
         PRIVATE
-        EASTL-object
         luisa-compute-ext-marl
         luisa-compute-ext-yyjson)
+
+if (NOT LUISA_COMPUTE_USE_SYSTEM_STL)
+    target_link_libraries(luisa-compute-core PRIVATE EASTL-object)
+endif ()
 
 set_target_properties(luisa-compute-core PROPERTIES
         UNITY_BUILD ${LUISA_COMPUTE_ENABLE_UNITY_BUILD}

@@ -17,8 +17,22 @@ SparseCommandList &SparseCommandList::operator<<(SparseUpdateTile &&tile) noexce
     return *this;
 }
 
+SparseCommandList &SparseCommandList::add_range(SparseCommandList &&cmdlist) noexcept {
+    if (cmdlist.empty()) [[unlikely]]
+        return *this;
+    auto size = _update_cmd.size();
+    luisa::enlarge_by(_update_cmd, cmdlist._update_cmd.size());
+    std::memcpy(_update_cmd.data() + size, cmdlist._update_cmd.data(), luisa::size_bytes(cmdlist._update_cmd));
+    cmdlist._update_cmd.clear();
+    return *this;
+}
+
 SparseCommandListCommit SparseCommandList::commit() noexcept {
     return {std::move(*this)};
+}
+
+void SparseCommandList::clear() noexcept {
+    _update_cmd.clear();
 }
 
 void SparseCommandListCommit::operator()(DeviceInterface *device, uint64_t stream_handle) noexcept {

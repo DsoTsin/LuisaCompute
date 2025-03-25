@@ -55,7 +55,7 @@ public:
             for (size_t s = tail; s != index; ++s) {
                 T *ptr = arr + GetIndex(s, capacity);
                 new (newArr + GetIndex(s, newCapa)) T(std::move(*ptr));
-                vstd::destruct(ptr);
+                std::destroy_at(ptr);
             }
             Allocator().Free(arr);
             arr = newArr;
@@ -73,7 +73,7 @@ public:
             for (size_t s = tail; s != index; ++s) {
                 T *ptr = arr + GetIndex(s, capacity);
                 new (newArr + GetIndex(s, newCapa)) T(std::move(*ptr));
-                vstd::destruct(ptr);
+                std::destroy_at(ptr);
             }
             Allocator().Free(arr);
             arr = newArr;
@@ -93,7 +93,7 @@ public:
             for (size_t s = tail; s != index; ++s) {
                 T *ptr = arr + GetIndex(s, capacity);
                 new (newArr + GetIndex(s, newCapa)) T(std::move(*ptr));
-                vstd::destruct(ptr);
+                std::destroy_at(ptr);
             }
             Allocator().Free(arr);
             arr = newArr;
@@ -103,7 +103,7 @@ public:
         return true;
     }
     bool pop(T *ptr) {
-        vstd::destruct(ptr);
+        std::destroy_at(ptr);
         std::lock_guard<spin_mutex> lck(mtx);
         if (head == tail)
             return false;
@@ -113,7 +113,7 @@ public:
         } else {
             new (ptr) T(std::move(value));
         }
-        vstd::destruct(std::addressof(value));
+        std::destroy_at(std::addressof(value));
         return true;
     }
     optional<T> pop() {
@@ -124,7 +124,7 @@ public:
         }
         auto value = &arr[GetIndex(tail++, capacity)];
         auto disp = scope_exit([value, this]() {
-            vstd::destruct(value);
+            std::destroy_at(value);
             mtx.unlock();
         });
         return optional<T>(std::move(*value));
@@ -136,13 +136,13 @@ public:
         }
         auto value = &arr[GetIndex(tail++, capacity)];
         auto disp = scope_exit([value]() {
-            vstd::destruct(value);
+            std::destroy_at(value);
         });
         return optional<T>(std::move(*value));
     }
     ~LockFreeArrayQueue() {
         for (size_t s = tail; s != head; ++s) {
-            vstd::destruct(std::addressof(arr[GetIndex(s, capacity)]));
+            std::destroy_at(std::addressof(arr[GetIndex(s, capacity)]));
         }
         Allocator().Free(arr);
     }
@@ -198,7 +198,7 @@ public:
             for (size_t s = tail; s != index; ++s) {
                 T *ptr = arr + GetIndex(s, capacity);
                 new (newArr + GetIndex(s, newCapa)) T(std::move(*ptr));
-                vstd::destruct(ptr);
+                std::destroy_at(ptr);
             }
             Allocator().Free(arr);
             arr = newArr;
@@ -215,7 +215,7 @@ public:
             for (size_t s = tail; s != index; ++s) {
                 T *ptr = arr + GetIndex(s, capacity);
                 new (newArr + GetIndex(s, newCapa)) T(std::move(*ptr));
-                vstd::destruct(ptr);
+                std::destroy_at(ptr);
             }
             Allocator().Free(arr);
             arr = newArr;
@@ -230,7 +230,7 @@ public:
         return &value;
     }
     bool pop(T *ptr) {
-        vstd::destruct(ptr);
+        std::destroy_at(ptr);
         if (head == tail)
             return false;
         auto &&value = arr[GetIndex(tail++, capacity)];
@@ -239,7 +239,7 @@ public:
         } else {
             new (ptr) T(std::move(value));
         }
-        vstd::destruct(std::addressof(value));
+        std::destroy_at(std::addressof(value));
         return true;
     }
     optional<T> pop() {
@@ -248,7 +248,7 @@ public:
         }
         auto value = &arr[GetIndex(tail++, capacity)];
         auto disp = scope_exit([value]() {
-            vstd::destruct(value);
+            std::destroy_at(value);
         });
         return optional<T>(std::move(*value));
     }
@@ -257,11 +257,11 @@ public:
             return;
         }
         auto value = &arr[GetIndex(tail++, capacity)];
-        vstd::destruct(value);
+        std::destroy_at(value);
     }
     ~SingleThreadArrayQueue() {
         for (size_t s = tail; s != head; ++s) {
-            vstd::destruct(std::addressof(arr[GetIndex(s, capacity)]));
+            std::destroy_at(std::addressof(arr[GetIndex(s, capacity)]));
         }
         Allocator().Free(arr);
     }

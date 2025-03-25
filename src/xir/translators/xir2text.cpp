@@ -214,22 +214,7 @@ private:
     }
 
     static void _emit_string_escaped(StringScratch &ss, luisa::string_view s) noexcept {
-        ss << "\"";
-        for (auto c : s) {
-            if (isprint(c)) {
-                switch (c) {
-                    case '\n': ss << "\\n"; break;
-                    case '\r': ss << "\\r"; break;
-                    case '\t': ss << "\\t"; break;
-                    case '\"': ss << "\\\""; break;
-                    case '\\': ss << "\\\\"; break;
-                    default: ss << luisa::string_view{&c, 1}; break;
-                }
-            } else {
-                ss << "\\x" << (c >> 4u) << (c & 0x0fu);
-            }
-        }
-        ss << "\"";
+        luisa::format_to(std::back_inserter(ss.string()), "{:?}", s);
     }
 
     void _emit_operands(const Instruction *inst) noexcept {
@@ -382,9 +367,9 @@ private:
 
     void _emit_alloca_inst(const AllocaInst *inst) noexcept {
         _main << "alloca ";
-        switch (inst->space()) {
-            case AllocSpace::LOCAL: _main << "local"; break;
-            case AllocSpace::SHARED: _main << "shared"; break;
+        switch (inst->op()) {
+            case AllocaOp::LOCAL: _main << "local"; break;
+            case AllocaOp::SHARED: _main << "shared"; break;
         }
     }
 

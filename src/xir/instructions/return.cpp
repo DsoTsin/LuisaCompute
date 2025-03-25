@@ -24,7 +24,7 @@ const Type *ReturnInst::return_type() const noexcept {
     return ret_value == nullptr ? nullptr : ret_value->type();
 }
 
-ReturnInst *ReturnInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+ReturnInst *ReturnInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_value = resolver.resolve(return_value());
     return b.return_(resolved_value);
 }

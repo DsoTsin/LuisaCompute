@@ -69,13 +69,17 @@ public:
         buildAccelSize += size;
     }
     void UniformAlign(size_t align) const {
+#ifdef LUISA_USE_SYSTEM_STL
+        argBuffer->resize(CalcAlign(argBuffer->size(), align));
+#else
         argBuffer->resize_uninitialized(CalcAlign(argBuffer->size(), align));
+#endif
     }
     template<typename T>
     void EmplaceData(T const &data) {
         size_t sz = argBuffer->size();
-        argBuffer->push_back_uninitialized(sizeof(T));
-        using PlaceHolder = eastl::aligned_storage_t<sizeof(T), 1>;
+        luisa::enlarge_by(*argBuffer, sizeof(T));
+        using PlaceHolder = luisa::aligned_storage_t<sizeof(T), 1>;
         *reinterpret_cast<PlaceHolder *>(argBuffer->data() + sz) =
             *reinterpret_cast<PlaceHolder const *>(&data);
     }
@@ -83,7 +87,7 @@ public:
     void EmplaceData(T const *data, size_t size) {
         size_t sz = argBuffer->size();
         auto byteSize = size * sizeof(T);
-        argBuffer->push_back_uninitialized(byteSize);
+        luisa::enlarge_by(*argBuffer, byteSize);
         std::memcpy(argBuffer->data() + sz, data, byteSize);
     }
     struct Visitor {
@@ -631,7 +635,7 @@ public:
                         {reinterpret_cast<uint8_t *>(&size), sizeof(uint)});
                 if (size == 0) return;
                 vstd::vector<std::byte> data;
-                data.push_back_uninitialized(std::min<size_t>(readback_buffer.byteSize, size));
+                luisa::enlarge_by(data, std::min<size_t>(readback_buffer.byteSize, size));
                 static_cast<ReadbackBuffer const *>(readback_buffer.buffer)
                     ->CopyData(
                         readback_buffer.offset,

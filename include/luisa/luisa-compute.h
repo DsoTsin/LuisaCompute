@@ -34,12 +34,12 @@
 #include <luisa/core/dynamic_module.h>
 #include <luisa/core/fiber.h>
 #include <luisa/core/first_fit.h>
-#include <luisa/core/forget.h>
 #include <luisa/core/intrin.h>
 #include <luisa/core/logging.h>
 #include <luisa/core/macro.h>
 #include <luisa/core/magic_enum.h>
 #include <luisa/core/mathematics.h>
+#include <luisa/core/memory_sanitizer.hpp>
 #include <luisa/core/platform.h>
 #include <luisa/core/pool.h>
 #include <luisa/core/shared_function.h>
@@ -166,8 +166,12 @@
 #endif
 
 #ifdef LUISA_ENABLE_TENSOR
-#include <luisa/tensor/scope.h>
+#include <luisa/tensor/expression.h>
+#include <luisa/tensor/fused_activation.h>
+#include <luisa/tensor/kernel.h>
+#include <luisa/tensor/pass/expr_topo.h>
 #include <luisa/tensor/tensor.h>
+#include <luisa/tensor/tensor_builder.h>
 #endif
 
 #include <luisa/vstl/allocate_type.h>
@@ -202,6 +206,7 @@
 #include <luisa/xir/basic_block.h>
 #include <luisa/xir/builder.h>
 #include <luisa/xir/constant.h>
+#include <luisa/xir/debug_printer.h>
 #include <luisa/xir/function.h>
 #include <luisa/xir/ilist.h>
 #include <luisa/xir/instruction.h>
@@ -237,6 +242,7 @@
 #include <luisa/xir/metadata/location.h>
 #include <luisa/xir/metadata/name.h>
 #include <luisa/xir/module.h>
+#include <luisa/xir/op.h>
 #include <luisa/xir/passes/aggregate_field_bitmask.h>
 #include <luisa/xir/passes/autodiff.h>
 #include <luisa/xir/passes/call_graph.h>

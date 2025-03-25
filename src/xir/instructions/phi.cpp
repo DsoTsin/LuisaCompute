@@ -64,7 +64,7 @@ ConstPhiIncomingUse PhiInst::incoming_use(size_t index) const noexcept {
     return {incoming.value, incoming.block};
 }
 
-PhiInst *PhiInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+PhiInst *PhiInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto cloned = b.phi(type());
     for (auto i = 0u; i < incoming_count(); i++) {
         auto incoming = this->incoming(i);

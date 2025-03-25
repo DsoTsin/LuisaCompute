@@ -19,6 +19,20 @@ enum struct DerivedValueTag {
     SPECIAL_REGISTER,
 };
 
+[[nodiscard]] inline luisa::string_view to_string(DerivedValueTag tag) noexcept {
+    using namespace std::string_view_literals;
+    switch (tag) {
+        case DerivedValueTag::UNDEFINED: return "undef"sv;
+        case DerivedValueTag::FUNCTION: return "func"sv;
+        case DerivedValueTag::BASIC_BLOCK: return "block"sv;
+        case DerivedValueTag::INSTRUCTION: return "inst"sv;
+        case DerivedValueTag::CONSTANT: return "const"sv;
+        case DerivedValueTag::ARGUMENT: return "arg"sv;
+        case DerivedValueTag::SPECIAL_REGISTER: return "sreg"sv;
+    }
+    return "unknown"sv;
+}
+
 class LC_XIR_API Value : public MetadataListMixin<PooledObject> {
 
 private:

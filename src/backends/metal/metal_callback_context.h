@@ -21,11 +21,12 @@ private:
 
 public:
     template<typename F>
+        requires(!std::same_as<std::remove_cvref_t<F>, Self>)
     explicit FunctionCallbackContext(F &&f) noexcept
         : _function{std::forward<F>(f)} {}
     ~FunctionCallbackContext() noexcept override = default;
 
-    FunctionCallbackContext(FunctionCallbackContext &&) = default;
+    FunctionCallbackContext(FunctionCallbackContext &&) noexcept = default;
     FunctionCallbackContext(const FunctionCallbackContext &) = delete;
 
     template<typename F>
@@ -37,4 +38,3 @@ public:
 };
 
 }// namespace luisa::compute::metal
-

@@ -28,7 +28,7 @@ public:
     void insert_argument(size_t index, Value *argument) noexcept;
     void remove_argument(size_t index) noexcept;
 
-    [[nodiscard]] CallInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] CallInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

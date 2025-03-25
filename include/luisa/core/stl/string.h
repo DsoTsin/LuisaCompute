@@ -7,11 +7,19 @@
 
 namespace luisa {
 
+#ifdef LUISA_USE_SYSTEM_STL
+using std::string;
+using std::u8string;
+using std::u16string;
+using std::u32string;
+using std::wstring;
+#else
 using string = std::basic_string<char, std::char_traits<char>, luisa::allocator<char>>;
 using u16string = std::basic_string<char16_t, std::char_traits<char16_t>, luisa::allocator<char16_t>>;
 using u32string = std::basic_string<char32_t, std::char_traits<char32_t>, luisa::allocator<char32_t>>;
 using u8string = std::basic_string<char8_t, std::char_traits<char8_t>, luisa::allocator<char8_t>>;
 using wstring = std::basic_string<wchar_t, std::char_traits<wchar_t>, luisa::allocator<wchar_t>>;
+#endif
 
 using std::string_view;
 using std::u16string_view;
@@ -70,4 +78,3 @@ template<typename C, typename CT>
 struct hash<std::basic_string_view<C, CT>> : basic_string_hash<C, CT> {};
 
 }// namespace luisa
-

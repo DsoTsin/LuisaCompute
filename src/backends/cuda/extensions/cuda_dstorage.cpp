@@ -16,24 +16,44 @@
 
 namespace luisa::compute::cuda {
 
-CUDAPinnedMemory::CUDAPinnedMemory(void *p, size_t size) noexcept
+[[nodiscard]] static bool check_cuda_property_supported(CUdevice device, CUdevice_attribute prop) noexcept {
+    auto good = 0;
+    LUISA_CHECK_CUDA(cuDeviceGetAttribute(&good, prop, device));
+    return good != 0;
+}
+
+[[nodiscard]] static int cuda_host_mem_register_flags(CUdevice device) noexcept {
+    int flags = CU_MEMHOSTREGISTER_DEVICEMAP;
+    if (check_cuda_property_supported(device, CU_DEVICE_ATTRIBUTE_READ_ONLY_HOST_REGISTER_SUPPORTED)) {
+        flags |= CU_MEMHOSTREGISTER_READ_ONLY;
+    } else {
+        LUISA_WARNING_WITH_LOCATION("CUDA device {} does not support read-only host memory registration.", device);
+    }
+    return flags;
+}
+
+CUDAPinnedMemory::CUDAPinnedMemory(CUdevice device, void *p, size_t size) noexcept
     : _host_pointer{p}, _device_address{}, _size_bytes{size} {
-    LUISA_CHECK_CUDA(cuMemHostRegister(
-        p, size,
-        CU_MEMHOSTREGISTER_DEVICEMAP |
-            CU_MEMHOSTREGISTER_READ_ONLY));
-    LUISA_CHECK_CUDA(cuMemHostGetDevicePointer(
-        &_device_address, p, 0));
+    if (auto ret = cuMemHostRegister(p, size, cuda_host_mem_register_flags(device));
+        ret != CUDA_SUCCESS) {
+        const char *error_string = nullptr;
+        cuGetErrorString(ret, &error_string);
+        LUISA_WARNING_WITH_LOCATION("Failed to register host memory: {}.", error_string);
+        return;
+    }
+    LUISA_CHECK_CUDA(cuMemHostGetDevicePointer(&_device_address, p, 0));
     LUISA_VERBOSE("Registered host memory at 0x{:016x} with {} "
                   "byte(s) into device address space at 0x{:016x}.",
                   reinterpret_cast<uint64_t>(p), size, _device_address);
 }
 
 CUDAPinnedMemory::~CUDAPinnedMemory() noexcept {
-    LUISA_CHECK_CUDA(cuMemHostUnregister(_host_pointer));
+    if (_device_address) {
+        LUISA_CHECK_CUDA(cuMemHostUnregister(_host_pointer));
+    }
 }
 
-CUDAMappedFile::CUDAMappedFile(luisa::string_view path) noexcept
+CUDAMappedFile::CUDAMappedFile(CUdevice device, luisa::string_view path) noexcept
     : _file_handle{},
       _file_mapping{},
       _mapped_pointer{},
@@ -78,7 +98,7 @@ CUDAMappedFile::CUDAMappedFile(luisa::string_view path) noexcept
         LUISA_WARNING_WITH_LOCATION("Failed to open file: {}", file_name);
         return;
     }
-    struct stat file_stat {};
+    struct stat file_stat{};
     if (fstat(file_handle, &file_stat) == -1) {
         LUISA_WARNING_WITH_LOCATION("Failed to get file size: {}", file_name);
         close(file_handle);
@@ -94,12 +114,15 @@ CUDAMappedFile::CUDAMappedFile(luisa::string_view path) noexcept
     _mapped_pointer = mapped_address;
     _size_bytes = file_stat.st_size;
 #endif
-    LUISA_CHECK_CUDA(cuMemHostRegister(
-        _mapped_pointer, _size_bytes,
-        CU_MEMHOSTREGISTER_DEVICEMAP |
-            CU_MEMHOSTREGISTER_READ_ONLY));
-    LUISA_CHECK_CUDA(cuMemHostGetDevicePointer(
-        &_device_address, _mapped_pointer, 0));
+    if (auto ret = cuMemHostRegister(_mapped_pointer, _size_bytes, cuda_host_mem_register_flags(device));
+        ret != CUDA_SUCCESS) {
+        const char *error_string = nullptr;
+        cuGetErrorString(ret, &error_string);
+        LUISA_WARNING_WITH_LOCATION("Failed to register host memory for file '{}': {}.", path, error_string);
+        // resources will be released in the destructor
+        return;
+    }
+    LUISA_CHECK_CUDA(cuMemHostGetDevicePointer(&_device_address, _mapped_pointer, 0));
     LUISA_VERBOSE("Mapped file '{}' to host address "
                   "0x{:016x} and device address 0x{:016x}.",
                   path,
@@ -178,7 +201,7 @@ void CUDADStorageExt::compress(const void *data, size_t size_bytes,
         case DStorageCompression::GDeflate: {
             _device->with_handle([&] {
                 // FIXME: nvCOMP does not support compression quality other than default
-                 auto algo = quality == DStorageCompressionQuality::Best ? 1 : 0;
+                auto algo = quality == DStorageCompressionQuality::Best ? 1 : 0;
                 nvcomp::GdeflateManager manager{nvcompGdeflateCompressionMaxAllowedChunkSize,
                                                 nvcompBatchedGdeflateOpts_t{algo}};
                 detail::cuda_compress_cpu(
@@ -266,10 +289,11 @@ ResourceCreationInfo CUDADStorageExt::create_stream_handle(const DStorageStreamO
 }
 
 DStorageExt::FileCreationInfo CUDADStorageExt::open_file_handle(luisa::string_view path) noexcept {
-    auto file = _device->with_handle([=] {
-        return luisa::new_with_allocator<CUDAMappedFile>(path);
+    auto file = _device->with_handle([=, device = _device->handle().device()] {
+        return luisa::new_with_allocator<CUDAMappedFile>(device, path);
     });
-    if (file->mapped_pointer() == nullptr) {
+    if (file->device_address() == 0) {
+        LUISA_WARNING_WITH_LOCATION("Failed to map file: {}", path);
         luisa::delete_with_allocator(file);
         return DStorageExt::FileCreationInfo::make_invalid();
     }
@@ -288,9 +312,14 @@ void CUDADStorageExt::close_file_handle(uint64_t handle) noexcept {
 }
 
 DStorageExt::PinnedMemoryInfo CUDADStorageExt::pin_host_memory(void *ptr, size_t size_bytes) noexcept {
-    auto p = _device->with_handle([=] {
-        return luisa::new_with_allocator<CUDAPinnedMemory>(ptr, size_bytes);
+    auto p = _device->with_handle([=, device = _device->handle().device()] {
+        return luisa::new_with_allocator<CUDAPinnedMemory>(device, ptr, size_bytes);
     });
+    if (p->device_address() == 0) {
+        LUISA_WARNING_WITH_LOCATION("Failed to pin host memory.");
+        luisa::delete_with_allocator(p);
+        return DStorageExt::PinnedMemoryInfo::make_invalid();
+    }
     DStorageExt::PinnedMemoryInfo info{};
     info.handle = reinterpret_cast<uint64_t>(p);
     info.native_handle = p->host_pointer();

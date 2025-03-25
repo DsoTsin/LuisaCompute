@@ -59,7 +59,11 @@ LCDevice::LCDevice(Context &&ctx, DeviceConfig const *settings)
         });
 #endif
     exts.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{TexCompressExt::name},
+#else
         TexCompressExt::name,
+#endif
         [](LCDevice *device) -> DeviceExtension * {
             return new DxTexCompressExt(&device->nativeDevice);
         },
@@ -67,7 +71,11 @@ LCDevice::LCDevice(Context &&ctx, DeviceConfig const *settings)
             delete static_cast<DxTexCompressExt *>(ext);
         });
     exts.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{NativeResourceExt::name},
+#else
         NativeResourceExt::name,
+#endif
         [](LCDevice *device) -> DeviceExtension * {
             return new DxNativeResourceExt(device, &device->nativeDevice);
         },
@@ -75,7 +83,11 @@ LCDevice::LCDevice(Context &&ctx, DeviceConfig const *settings)
             delete static_cast<DxNativeResourceExt *>(ext);
         });
     exts.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{RasterExt::name},
+#else
         RasterExt::name,
+#endif
         [](LCDevice *device) -> DeviceExtension * {
             return new DxRasterExt(device->nativeDevice);
         },
@@ -83,7 +95,11 @@ LCDevice::LCDevice(Context &&ctx, DeviceConfig const *settings)
             delete static_cast<DxRasterExt *>(ext);
         });
     exts.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{DStorageExt::name},
+#else
         DStorageExt::name,
+#endif
         [](LCDevice *device) -> DeviceExtension * {
             return new DStorageExtImpl(device->context().runtime_directory(), device);
         },
@@ -91,7 +107,11 @@ LCDevice::LCDevice(Context &&ctx, DeviceConfig const *settings)
             delete static_cast<DStorageExtImpl *>(ext);
         });
     exts.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{DirectMLExt::name},
+#else
         DirectMLExt::name,
+#endif
         [](LCDevice *device) -> DeviceExtension * {
             return new DxDirectMLExt(device);
         },
@@ -99,7 +119,11 @@ LCDevice::LCDevice(Context &&ctx, DeviceConfig const *settings)
             delete static_cast<DxDirectMLExt *>(ext);
         });
     exts.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{DXHDRExt::name},
+#else
         DXHDRExt::name,
+#endif
         [](LCDevice *device) -> DeviceExtension * {
             return new DXHDRExtImpl(device);
         },
@@ -108,7 +132,11 @@ LCDevice::LCDevice(Context &&ctx, DeviceConfig const *settings)
         });
 #ifdef LCDX_ENABLE_CUDA
     exts.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{DxCudaInterop::name},
+#else
         DxCudaInterop::name,
+#endif
         [](LCDevice *device) -> DeviceExtension * {
             return new DxCudaInteropImpl(*device);
         },
@@ -117,7 +145,11 @@ LCDevice::LCDevice(Context &&ctx, DeviceConfig const *settings)
         });
 #endif
     exts.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{PinnedMemoryExt::name},
+#else
         PinnedMemoryExt::name,
+#endif
         [](LCDevice *device) -> DeviceExtension * {
             return new DxPinnedMemoryExt(device);
         },
@@ -603,7 +635,7 @@ DeviceExtension *LCDevice::extension(vstd::string_view name) noexcept {
 }
 void LCDevice::set_name(luisa::compute::Resource::Tag resource_tag, uint64_t resource_handle, luisa::string_view name) noexcept {
     vstd::vector<wchar_t> vec;
-    vec.push_back_uninitialized(name.size() + 1);
+    luisa::enlarge_by(vec, name.size() + 1);
     vec[name.size()] = 0;
     for (auto i : vstd::range(name.size())) {
         vec[i] = name[i];
@@ -617,7 +649,7 @@ void LCDevice::set_name(luisa::compute::Resource::Tag resource_tag, uint64_t res
             }
             auto instBuffer = reinterpret_cast<TopAccel *>(resource_handle)->GetInstBuffer();
             constexpr auto inst = L"_Instance"sv;
-            vec.resize_uninitialized(name.size() + inst.size() + 1);
+            luisa::vector_resize(vec, name.size() + inst.size() + 1);
             vec[vec.size() - 1] = 0;
             for (auto i : vstd::range(inst.size())) {
                 vec[name.size() + i] = inst[i];
@@ -653,7 +685,7 @@ void LCDevice::set_name(luisa::compute::Resource::Tag resource_tag, uint64_t res
         case Tag::SWAP_CHAIN: {
             size_t backBuffer = 0;
             for (auto &&i : reinterpret_cast<LCSwapChain *>(resource_handle)->m_renderTargets) {
-                vec.resize_uninitialized(name.size());
+                luisa::vector_resize(vec, name.size());
                 vec.push_back(L'_');
                 auto num = vstd::to_string(backBuffer);
                 for (auto &&i : num) {
@@ -741,13 +773,13 @@ void LCDevice::update_sparse_resources(
                     tex->AllocateTile(t.start_tile, t.tile_count, t.mip_level, t.allocated_heap, &tile_tracker);
                 } else if constexpr (std::is_same_v<T, SparseBufferMapOperation>) {
                     auto buffer = reinterpret_cast<SparseBuffer *>(i.handle);
-                    buffer->AllocateTile( t.start_tile, t.tile_count, t.allocated_heap, &tile_tracker);
+                    buffer->AllocateTile(t.start_tile, t.tile_count, t.allocated_heap, &tile_tracker);
                 } else if constexpr (std::is_same_v<T, SparseTextureUnMapOperation>) {
                     auto tex = reinterpret_cast<SparseTexture *>(i.handle);
                     tex->DeAllocateTile(t.start_tile, t.tile_count, t.mip_level, &tile_tracker);
                 } else {
                     auto buffer = reinterpret_cast<SparseBuffer *>(i.handle);
-                    buffer->DeAllocateTile( t.start_tile, t.tile_count, &tile_tracker);
+                    buffer->DeAllocateTile(t.start_tile, t.tile_count, &tile_tracker);
                 }
             },
             i.operations);

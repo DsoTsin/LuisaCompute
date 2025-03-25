@@ -66,7 +66,6 @@ CompileResult ShaderCompiler::compile(
         code.size(),
         CP_ACP};
     ComPtr<IDxcResult> compileResult;
-
     LC_DXC_THROW_IF_FAILED(compiler()->Compile(
         &buffer,
         args.data(),
@@ -170,7 +169,7 @@ RasterBin ShaderCompiler::compile_raster(
     args.emplace_back(L"/DVS");
     RasterBin bin;
     bin.vertex = compile(code, args);
-    args.resize_uninitialized(size);
+    luisa::vector_resize(args, size);
     smStr.clear();
     smStr << L"ps_" << GetSM(shaderModel);
     args.emplace_back(smStr.c_str());

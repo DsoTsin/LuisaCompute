@@ -68,7 +68,7 @@ const BasicBlock *LoopInst::update_block() const noexcept {
     return _update_block;
 }
 
-LoopInst *LoopInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+LoopInst *LoopInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto cloned = b.loop();
     auto resolved_prepare_block = resolver.resolve(prepare_block());
     LUISA_DEBUG_ASSERT(resolved_prepare_block == nullptr || resolved_prepare_block->isa<BasicBlock>(), "Invalid prepare block.");
@@ -108,7 +108,7 @@ const BasicBlock *SimpleLoopInst::body_block() const noexcept {
     return const_cast<SimpleLoopInst *>(this)->body_block();
 }
 
-SimpleLoopInst *SimpleLoopInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+SimpleLoopInst *SimpleLoopInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto cloned = b.simple_loop();
     auto resolved_body_block = resolver.resolve(body_block());
     LUISA_DEBUG_ASSERT(resolved_body_block == nullptr || resolved_body_block->isa<BasicBlock>(), "Invalid body block.");

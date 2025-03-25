@@ -29,7 +29,7 @@ inline T *vengine_new_array(size_t arrayCount, Args &&...args) noexcept {
 }
 template<typename T>
 inline void vengine_delete(T *ptr) noexcept {
-    vstd::destruct(ptr);
+    std::destroy_at(ptr);
     vengine_free(ptr);
 }
 

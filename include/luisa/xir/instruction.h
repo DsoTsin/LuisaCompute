@@ -2,9 +2,9 @@
 
 #include <luisa/core/concepts.h>
 #include <luisa/xir/user.h>
+#include <luisa/xir/op.h>
 
 namespace luisa::compute::xir {
-
 class BasicBlock;
 class Function;
 
@@ -119,7 +119,7 @@ struct InstructionCloneValueResolver {
     [[nodiscard]] virtual Value *resolve(const Value *value) noexcept = 0;
 };
 
-class Builder;
+class XIRBuilder;
 
 class LC_XIR_API Instruction : public IntrusiveNode<Instruction, DerivedBlockScopeValue<Instruction, DerivedValueTag::INSTRUCTION, User>> {
 
@@ -131,7 +131,11 @@ protected:
 public:
     explicit Instruction(BasicBlock *parent_block, const Type *type) noexcept;
     [[nodiscard]] virtual DerivedInstructionTag derived_instruction_tag() const noexcept = 0;
-    [[nodiscard]] virtual Instruction *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept = 0;
+    [[nodiscard]] virtual Instruction *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept = 0;
+
+    [[nodiscard]] virtual luisa::string intrinsic_identifier() const noexcept {
+        return luisa::string{xir::to_string(derived_instruction_tag())};
+    }
 
     void remove_self() noexcept override;
     void insert_before_self(Instruction *node) noexcept override;
@@ -150,7 +154,7 @@ class LC_XIR_API SentinelInst final : public Instruction {
 public:
     explicit SentinelInst(BasicBlock *parent_block) noexcept;
     [[nodiscard]] DerivedInstructionTag derived_instruction_tag() const noexcept override;
-    [[nodiscard]] Instruction *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] Instruction *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 using InstructionList = InlineIntrusiveList<Instruction, SentinelInst>;
@@ -280,16 +284,56 @@ public:
     [[nodiscard]] ControlFlowMerge *control_flow_merge() noexcept final { return this; }
 };
 
-template<typename OpType>
-class InstructionOpMixin {
+template<typename OpType, typename Base>
+    requires std::derived_from<Base, Instruction>
+class InstructionOpMixin : public Base {
 
 private:
     OpType _op;
 
 public:
-    explicit InstructionOpMixin(OpType op) noexcept : _op{op} {}
+    using Super = InstructionOpMixin;
+
+    template<typename... Args>
+    explicit InstructionOpMixin(OpType op, Args &&...args) noexcept
+        : Base{std::forward<Args>(args)...}, _op{op} {}
+
+    [[nodiscard]] luisa::string intrinsic_identifier() const noexcept final {
+        return Base::intrinsic_identifier()
+            .append("::")
+            .append(xir::to_string(op()));
+    }
+
     [[nodiscard]] OpType op() const noexcept { return _op; }
     void set_op(OpType op) noexcept { _op = op; }
+};
+
+namespace detail {
+[[nodiscard]] LC_XIR_API luisa::string
+intrinsic_identifier_with_print_message(
+    luisa::string base_ident,
+    luisa::string_view message) noexcept;
+}// namespace detail
+
+template<typename Base>
+    requires std::derived_from<Base, Instruction>
+class PrintMessageMixin : public Base {
+private:
+    luisa::string _message;
+
+public:
+    using Super = PrintMessageMixin;
+
+    template<typename... Args>
+    explicit PrintMessageMixin(luisa::string message, Args &&...args) noexcept
+        : Base{std::forward<Args>(args)...}, _message{std::move(message)} {}
+
+    [[nodiscard]] const luisa::string &message() const noexcept { return _message; }
+    void set_message(luisa::string_view message) noexcept { _message = message; }
+
+    [[nodiscard]] luisa::string intrinsic_identifier() const noexcept final {
+        return xir::detail::intrinsic_identifier_with_print_message(Base::intrinsic_identifier(), _message);
+    }
 };
 
 }// namespace luisa::compute::xir

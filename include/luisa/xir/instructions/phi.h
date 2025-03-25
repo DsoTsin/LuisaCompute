@@ -47,7 +47,7 @@ public:
     [[nodiscard]] auto incoming_value_uses() const noexcept { return operand_uses(); }
     [[nodiscard]] auto incoming_blocks() noexcept { return luisa::span{_incoming_blocks}; }
     [[nodiscard]] auto incoming_blocks() const noexcept { return luisa::span{_incoming_blocks}; }
-    [[nodiscard]] PhiInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] PhiInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

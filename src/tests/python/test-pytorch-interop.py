@@ -31,7 +31,7 @@ def cu_device_ptr_to_torch_tensor(ptr, shape, dtype=cupy.float32):
     array = cupy.ndarray(shape, dtype=dtype, memptr=memptr)
 
     # Convert the CuPy ndarray to a DLPack tensor and then to a PyTorch tensor
-    return torch.utils.dlpack.from_dlpack(array.toDlpack())
+    return torch.utils.dlpack.from_dlpack(array)
 
 
 def lc_buffer_to_torch(buf):

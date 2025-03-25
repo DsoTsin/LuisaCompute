@@ -169,6 +169,11 @@ if get_config("dx_backend") then
         test_proj("test_cuda_dx_interop")
     end
     test_proj("test_dml")
+    -- test_proj("test_matrix_multiply")
+    -- test_proj("test_conv")
+    -- test_proj("test_tensor", false, function()
+    --     add_deps("lc-tensor")
+    -- end)
 end
 test_proj("test_manual_ast")
 if not is_mode("debug") then

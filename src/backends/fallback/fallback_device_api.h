@@ -181,7 +181,6 @@ struct alignas(16) AccelInstance {
     uint8_t is_motion : 1;
     uint8_t is_srt : 1;
     uint8_t is_matrix : 1;
-    uint8_t padding : 2;
     uint8_t motion_steps;
     uint user_id;
     MotionInstanceTransform *motion;

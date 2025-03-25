@@ -11,6 +11,16 @@ enum struct DerivedFunctionTag {
     EXTERNAL,
 };
 
+[[nodiscard]] constexpr luisa::string_view to_string(DerivedFunctionTag tag) noexcept {
+    using namespace std::string_view_literals;
+    switch (tag) {
+        case DerivedFunctionTag::KERNEL: return "kernel"sv;
+        case DerivedFunctionTag::CALLABLE: return "callable"sv;
+        case DerivedFunctionTag::EXTERNAL: return "external"sv;
+    }
+    return "unknown"sv;
+}
+
 class Module;
 class FunctionDefinition;
 

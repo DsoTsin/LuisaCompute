@@ -114,7 +114,7 @@ ComputeShader *ComputeShader::CompileCompute(
                         bdlsBufferCount,
                         blockSize,
                         str.printers);
-                    WriteBinaryIO(cacheType, fileIo, fileName, {reinterpret_cast<std::byte const *>(serData.data()), serData.size_bytes()});
+                    WriteBinaryIO(cacheType, fileIo, fileName, {reinterpret_cast<std::byte const *>(serData.data()), luisa::size_bytes(serData)});
                 }
                 auto cs = new ComputeShader(
                     blockSize,
@@ -221,7 +221,7 @@ void ComputeShader::SaveCompute(
                 bdlsBufferCount,
                 blockSize,
                 str.printers);
-            static_cast<void>(fileIo->write_shader_bytecode(fileName, {reinterpret_cast<std::byte const *>(serData.data()), serData.size_bytes()}));
+            static_cast<void>(fileIo->write_shader_bytecode(fileName, {reinterpret_cast<std::byte const *>(serData.data()), luisa::size_bytes(serData)}));
         },
         [](auto &&err) {
             LUISA_ERROR("DXC compute-shader compile error: {}", err);

@@ -27,6 +27,16 @@ namespace lc::validation {
 static vstd::unordered_map<uint64_t, StreamOption> stream_options;
 static std::mutex stream_mtx;
 
+namespace {
+[[nodiscard]] auto unordered_map_key(luisa::string_view key) noexcept {
+#ifdef LUISA_USE_SYSTEM_STL
+    return luisa::string{key};
+#else
+    return key;
+#endif
+}
+}// namespace
+
 Device::Device(Context &&ctx, luisa::shared_ptr<DeviceInterface> &&native) noexcept
     : DeviceInterface{std::move(ctx)},
       _native{std::move(native)} {
@@ -38,7 +48,7 @@ Device::Device(Context &&ctx, luisa::shared_ptr<DeviceInterface> &&native) noexc
     if (dx_hdr_ext) {
         auto impl = new DXHDRExtImpl(dx_hdr_ext);
         exts.try_emplace(
-            DXHDRExt::name,
+            unordered_map_key(DXHDRExt::name),
             ExtPtr{
                 impl,
                 detail::ext_deleter<DeviceExtension>{
@@ -49,7 +59,7 @@ Device::Device(Context &&ctx, luisa::shared_ptr<DeviceInterface> &&native) noexc
     if (raster_ext) {
         auto raster_impl = new RasterExtImpl(raster_ext);
         exts.try_emplace(
-            RasterExt::name,
+            unordered_map_key(RasterExt::name),
             ExtPtr{
                 raster_impl,
                 detail::ext_deleter<DeviceExtension>{[](DeviceExtension *ptr) {
@@ -59,7 +69,7 @@ Device::Device(Context &&ctx, luisa::shared_ptr<DeviceInterface> &&native) noexc
     if (dstorage_ext) {
         auto dstorage_impl = new DStorageExtImpl(dstorage_ext, this);
         exts.try_emplace(
-            DStorageExt::name,
+            unordered_map_key(DStorageExt::name),
             ExtPtr{
                 dstorage_impl,
                 detail::ext_deleter<DeviceExtension>{[](DeviceExtension *ptr) {
@@ -69,7 +79,7 @@ Device::Device(Context &&ctx, luisa::shared_ptr<DeviceInterface> &&native) noexc
     if (pinned_ext) {
         auto pinned_ext_impl = new PinnedMemoryExtImpl(pinned_ext);
         exts.try_emplace(
-            PinnedMemoryExt::name,
+            unordered_map_key(PinnedMemoryExt::name),
             ExtPtr{
                 pinned_ext_impl,
                 detail::ext_deleter<DeviceExtension>{[](DeviceExtension *ptr) {
@@ -79,7 +89,7 @@ Device::Device(Context &&ctx, luisa::shared_ptr<DeviceInterface> &&native) noexc
     if (native_res_ext) {
         auto native_res_ext_impl = new NativeResourceExtImpl(this, native_res_ext);
         exts.try_emplace(
-            NativeResourceExt::name,
+            unordered_map_key(NativeResourceExt::name),
             ExtPtr{
                 native_res_ext_impl,
                 detail::ext_deleter<DeviceExtension>{[](DeviceExtension *ptr) {
@@ -133,7 +143,7 @@ void Device::destroy_bindless_array(uint64_t handle) noexcept {
 }
 void Device::add_custom_stream(uint64_t handle, StreamOption &&opt) {
     std::lock_guard lck{stream_mtx};
-    stream_options.force_emplace(handle, std::move(opt));
+    stream_options[handle] = std::move(opt);
 }
 
 // stream
@@ -357,7 +367,7 @@ void Device::set_name(luisa::compute::Resource::Tag resource_tag, uint64_t resou
     _native->set_name(resource_tag, resource_handle, name);
 }
 void Device::check_stream(uint64_t stream, StreamFunc func, uint64_t custom_cmd_id) {
-    auto stream_ptr = RWResource::get<RWResource>(stream);
+    auto stream_ptr = RWResource::get<RWResource>(stream, "stream");
     if (!stream_ptr) {
         LUISA_ERROR("Invalid stream.");
     }

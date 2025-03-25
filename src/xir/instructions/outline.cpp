@@ -5,7 +5,7 @@
 
 namespace luisa::compute::xir {
 
-OutlineInst *OutlineInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+OutlineInst *OutlineInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto cloned = b.outline();
     auto resolved_target = resolver.resolve(target_block());
     LUISA_DEBUG_ASSERT(resolved_target == nullptr || resolved_target->isa<BasicBlock>(), "Invalid target block.");

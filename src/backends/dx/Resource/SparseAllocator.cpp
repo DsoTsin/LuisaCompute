@@ -18,7 +18,7 @@ auto SparseAllocator::AllocateHeap() -> PtrMap::iterator {
     auto fullIte = fullMaps.emplace(std::move(heap));
     Heap *ptr = &fullIte.value();
     auto ite = waitingMaps.try_emplace(heapPtr, ptr);
-    ptr->waitingPools.push_back_uninitialized(tileCapacity);
+    luisa::enlarge_by(ptr->waitingPools, tileCapacity);
     for (uint i = 0; i < tileCapacity; ++i) {
         ptr->waitingPools[i] = i;
     }
@@ -69,7 +69,7 @@ void SparseAllocator::ClearAllocate() {
     for (auto &&i : fullMaps) {
         auto &heap = i.second;
         heap.waitingPools.clear();
-        heap.waitingPools.push_back_uninitialized(tileCapacity);
+        luisa::enlarge_by(heap.waitingPools, tileCapacity);
         for (uint i = 0; i < tileCapacity; ++i) {
             heap.waitingPools[i] = i;
         }

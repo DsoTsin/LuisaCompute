@@ -5,7 +5,7 @@
 
 namespace luisa::compute::xir {
 
-BranchInst *BranchInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+BranchInst *BranchInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto cloned = b.br();
     auto resolved_target = resolver.resolve(target_block());
     LUISA_DEBUG_ASSERT(resolved_target == nullptr || resolved_target->isa<BasicBlock>(), "Invalid target block.");
@@ -13,7 +13,7 @@ BranchInst *BranchInst::clone(Builder &b, InstructionCloneValueResolver &resolve
     return cloned;
 }
 
-ConditionalBranchInst *ConditionalBranchInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+ConditionalBranchInst *ConditionalBranchInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_cond = resolver.resolve(condition());
     auto cloned = b.cond_br(resolved_cond);
     auto resolved_true_block = resolver.resolve(true_block());

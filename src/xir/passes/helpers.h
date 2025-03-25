@@ -8,7 +8,7 @@ class AllocaInst;
 class PhiInst;
 class Value;
 class Instruction;
-class Builder;
+class XIRBuilder;
 class FunctionDefinition;
 
 struct InstructionCloneValueResolver;

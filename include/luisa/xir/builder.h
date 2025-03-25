@@ -32,7 +32,7 @@
 
 namespace luisa::compute::xir {
 
-class LC_XIR_API Builder {
+class LC_XIR_API XIRBuilder {
 
 private:
     Pool *_pool = nullptr;
@@ -43,7 +43,7 @@ private:
     [[nodiscard]] auto _create_and_append_instruction(Args &&...args) noexcept -> T *;
 
 public:
-    Builder() noexcept;
+    XIRBuilder() noexcept;
     void set_insertion_point(Instruction *insertion_point) noexcept;
     void set_insertion_point(BasicBlock *block) noexcept;
     [[nodiscard]] auto insertion_point() noexcept -> Instruction * { return _insertion_point; }
@@ -113,7 +113,7 @@ public:
     PrintInst *print(luisa::string format, luisa::span<Value *const> values) noexcept;
     PrintInst *print(luisa::string format, std::initializer_list<Value *> values) noexcept;
 
-    AllocaInst *alloca_(const Type *type, AllocSpace space) noexcept;
+    AllocaInst *alloca_(const Type *type, AllocaOp space) noexcept;
     AllocaInst *alloca_local(const Type *type) noexcept;
     AllocaInst *alloca_shared(const Type *type) noexcept;
 

@@ -52,7 +52,7 @@ public:
         disp.ptr = vengine_malloc(sizeof(T));
         new (disp.ptr) T(std::move(t));
         disp.dtor = [](void *ptr) {
-            vstd::destruct(reinterpret_cast<T *>(ptr));
+            std::destroy_at(reinterpret_cast<T *>(ptr));
         };
     }
     void execute() noexcept;

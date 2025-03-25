@@ -6,6 +6,13 @@
 #include <memory>
 #include <cstring>
 
+#ifdef LUISA_USE_SYSTEM_STL
+
+#include <span>
+#include <bit>
+
+#else
+
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
@@ -24,7 +31,6 @@
 #include <EASTL/shared_ptr.h>
 #include <EASTL/span.h>
 #include <EASTL/bonus/compressed_pair.h>
-#include <luisa/core/intrin.h>
 
 #if defined(__clang__)
 #pragma clang diagnostic pop
@@ -32,6 +38,8 @@
 #pragma GCC diagnostic pop
 #elif defined(_MSC_VER)
 #pragma warning(pop)
+#endif
+
 #endif
 
 #include <luisa/core/dll_export.h>
@@ -65,6 +73,13 @@ LUISA_EXPORT_API void *allocator_reallocate(void *p, size_t size, size_t alignme
     return (s + (a - 1)) & ~(a - 1);
 }
 
+#ifdef LUISA_USE_SYSTEM_STL
+
+template<typename T = std::byte>
+using allocator = std::allocator<T>;
+
+#else
+
 template<typename T = std::byte>
 struct allocator {
     using value_type = T;
@@ -76,7 +91,6 @@ struct allocator {
         return static_cast<T *>(luisa::detail::allocator_allocate(sizeof(T) * n, alignof(T)));
     }
     [[nodiscard]] auto allocate(std::size_t n, size_t alignment, size_t) const noexcept {
-        LUISA_ASSUME(alignment >= alignof(T));
         return static_cast<T *>(luisa::detail::allocator_allocate(sizeof(T) * n, alignment));
     }
     void deallocate(T *p, size_t) const noexcept {
@@ -90,6 +104,8 @@ struct allocator {
         return std::is_same_v<T, R>;
     }
 };
+
+#endif
 
 template<typename T>
 [[nodiscard]] inline auto allocate_with_allocator(size_t n = 1u) noexcept {
@@ -114,8 +130,31 @@ inline void delete_with_allocator(T *p) noexcept {
     }
 }
 
+#ifdef LUISA_USE_SYSTEM_STL
+
+using std::bit_cast;
+using std::span;
+
+using std::const_pointer_cast;
+using std::dynamic_pointer_cast;
+using std::enable_shared_from_this;
+using std::make_shared;
+using std::make_unique;
+using std::reinterpret_pointer_cast;
+using std::shared_ptr;
+using std::static_pointer_cast;
+using std::unique_ptr;
+using std::weak_ptr;
+
+using std::make_pair;
+using std::aligned_storage_t;
+
+#else
+
 using eastl::bit_cast;
 using eastl::span;
+
+using eastl::make_pair;
 
 // smart pointers
 using eastl::compressed_pair;
@@ -130,6 +169,10 @@ using eastl::shared_ptr;
 using eastl::static_pointer_cast;
 using eastl::unique_ptr;
 using eastl::weak_ptr;
+
+using eastl::aligned_storage_t;
+
+#endif
 
 // hash functions
 template<typename T>
@@ -155,6 +198,7 @@ struct pointer_hash {
                                       uint64_t seed = hash64_default_seed) const noexcept {
         return (*this)(ptr.get(), seed);
     }
+#ifndef LUISA_USE_SYSTEM_STL
     [[nodiscard]] uint64_t operator()(const std::shared_ptr<T> &ptr,
                                       uint64_t seed = hash64_default_seed) const noexcept {
         return (*this)(ptr.get(), seed);
@@ -164,6 +208,7 @@ struct pointer_hash {
                                       uint64_t seed = hash64_default_seed) const noexcept {
         return (*this)(ptr.get(), seed);
     }
+#endif
 };
 
 template<>
@@ -183,4 +228,3 @@ struct pointer_hash<void> {
 };
 
 }// namespace luisa
-

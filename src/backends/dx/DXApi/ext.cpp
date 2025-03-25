@@ -204,7 +204,7 @@ DStorageExtImpl::FileCreationInfo DStorageExtImpl::open_file_handle(luisa::strin
     init_factory();
     ComPtr<IDStorageFile> file;
     luisa::vector<wchar_t> wstr;
-    wstr.push_back_uninitialized(path.size() + 1);
+    luisa::enlarge_by(wstr, path.size() + 1);
     wstr[path.size()] = 0;
     for (size_t i = 0; i < path.size(); ++i) {
         wstr[i] = path[i];
@@ -267,7 +267,7 @@ void DStorageExtImpl::compress(
         DStorageCreateCompressionCodec = dstorage_module.function<std::remove_pointer_t<decltype(DStorageCreateCompressionCodec)>>("DStorageCreateCompressionCodec");
         DStorageCreateCompressionCodec(DSTORAGE_COMPRESSION_FORMAT_GDEFLATE, std::thread::hardware_concurrency(), IID_PPV_ARGS(compression_codec.GetAddressOf()));
     }();
-    result.push_back_uninitialized(compression_codec->CompressBufferBound(size_bytes));
+    luisa::enlarge_by(result, compression_codec->CompressBufferBound(size_bytes));
     ThrowIfFailed(compression_codec->CompressBuffer(
         data,
         size_bytes,

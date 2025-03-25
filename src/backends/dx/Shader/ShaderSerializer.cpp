@@ -34,7 +34,7 @@ namespace detail {
 void SerPrinterSize(std::pair<vstd::string, Type const *> const &printer, vstd::vector<std::byte> &vec) {
     std::pair<size_t, size_t> strAndTypeSize{printer.first.size(), printer.second->description().size()};
     auto lastSize = vec.size();
-    vec.push_back_uninitialized(strAndTypeSize.first + strAndTypeSize.second + sizeof(strAndTypeSize));
+    luisa::enlarge_by(vec, strAndTypeSize.first + strAndTypeSize.second + sizeof(strAndTypeSize));
     auto ptr = vec.data() + lastSize;
     std::memcpy(ptr, &strAndTypeSize, sizeof(strAndTypeSize));
     ptr += sizeof(strAndTypeSize);
@@ -68,7 +68,7 @@ ShaderSerializer::Serialize(
     using namespace shader_ser;
     vstd::vector<std::byte> result;
     result.reserve(sizeof(Header) + binByte.size_bytes() + properties.size_bytes() + kernelArgs.size_bytes() + kRootSigReserveSize);
-    result.push_back_uninitialized(sizeof(Header));
+    luisa::enlarge_by(result, sizeof(Header));
     for (auto &i : printers) {
         detail::SerPrinterSize(i, result);
     }
@@ -107,7 +107,7 @@ vstd::vector<std::byte> ShaderSerializer::RasterSerialize(
     using namespace shader_ser;
     vstd::vector<std::byte> result;
     result.reserve(sizeof(RasterHeader) + vertBin.size_bytes() + pixelBin.size_bytes() + properties.size_bytes() + kernelArgs.size_bytes() + kRootSigReserveSize);
-    result.push_back_uninitialized(sizeof(RasterHeader));
+    luisa::enlarge_by(result, sizeof(RasterHeader));
     RasterHeader header = {
         .headerVersion = kHeaderVersion,
         .md5 = checkMD5,
@@ -262,11 +262,11 @@ ComputeShader *ShaderSerializer::DeSerialize(
     }
     vstd::vector<hlsl::Property> properties;
     vstd::vector<SavedArgument> kernelArgs;
-    properties.push_back_uninitialized(header.propertyCount);
-    kernelArgs.push_back_uninitialized(header.kernelArgCount);
-    std::memcpy(properties.data(), binPtr, properties.size_bytes());
-    binPtr += properties.size_bytes();
-    std::memcpy(kernelArgs.data(), binPtr, kernelArgs.size_bytes());
+    luisa::enlarge_by(properties, header.propertyCount);
+    luisa::enlarge_by(kernelArgs, header.kernelArgCount);
+    std::memcpy(properties.data(), binPtr, luisa::size_bytes(properties));
+    binPtr += luisa::size_bytes(properties);
+    std::memcpy(kernelArgs.data(), binPtr, luisa::size_bytes(kernelArgs));
 
     auto cs = new ComputeShader(
         uint3(header.blockSize[0], header.blockSize[1], header.blockSize[2]),
@@ -337,11 +337,11 @@ RasterShader *ShaderSerializer::RasterDeSerialize(
     binPtr += header.rootSigBytes;
     // psoDesc.pRootSignature = rootSig.Get();
     vstd::vector<std::byte> vertBin;
-    vertBin.push_back_uninitialized(header.vertCodeBytes);
+    luisa::enlarge_by(vertBin, header.vertCodeBytes);
     std::memcpy(vertBin.data(), binPtr, header.vertCodeBytes);
     binPtr += header.vertCodeBytes;
     vstd::vector<std::byte> pixelBin;
-    pixelBin.push_back_uninitialized(header.pixelCodeBytes);
+    luisa::enlarge_by(pixelBin, header.pixelCodeBytes);
     std::memcpy(pixelBin.data(), binPtr, header.pixelCodeBytes);
     binPtr += header.pixelCodeBytes;
     // ComPtr<ID3D12PipelineState> pso;
@@ -370,11 +370,11 @@ RasterShader *ShaderSerializer::RasterDeSerialize(
     // }
     vstd::vector<hlsl::Property> properties;
     vstd::vector<SavedArgument> kernelArgs;
-    properties.push_back_uninitialized(header.propertyCount);
-    kernelArgs.push_back_uninitialized(header.kernelArgCount);
-    std::memcpy(properties.data(), binPtr, properties.size_bytes());
-    binPtr += properties.size_bytes();
-    std::memcpy(kernelArgs.data(), binPtr, kernelArgs.size_bytes());
+    luisa::enlarge_by(properties, header.propertyCount);
+    luisa::enlarge_by(kernelArgs, header.kernelArgCount);
+    std::memcpy(properties.data(), binPtr, luisa::size_bytes(properties));
+    binPtr += luisa::size_bytes(properties);
+    std::memcpy(kernelArgs.data(), binPtr, luisa::size_bytes(kernelArgs));
     auto s = new RasterShader(
         device,
         header.md5,

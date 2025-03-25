@@ -3,7 +3,7 @@
 
 namespace luisa::compute::xir {
 
-RasterDiscardInst *RasterDiscardInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+RasterDiscardInst *RasterDiscardInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     return b.raster_discard();
 }
 

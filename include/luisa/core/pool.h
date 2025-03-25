@@ -9,7 +9,7 @@ namespace luisa {
 
 namespace detail {
 void LC_CORE_API memory_pool_check_memory_leak(size_t expected, size_t actual) noexcept;
-}
+}// namespace detail
 
 /**
  * @brief Pool class
@@ -39,22 +39,7 @@ private:
         }
     }
 
-public:
-    /**
-     * @brief Construct a new Pool object.
-     * default constructor 
-     */
-    Pool() noexcept = default;
-    Pool(Pool &&) noexcept = default;
-    Pool(const Pool &) noexcept = delete;
-    Pool &operator=(Pool &&) noexcept = default;
-    Pool &operator=(const Pool &) noexcept = default;
-
-    /**
-     * @brief Destroy the Pool object.
-     * detect leaking
-     */
-    ~Pool() noexcept {
+    void _dispose() noexcept {
         if (!_blocks.empty()) {
             if constexpr (check_recycle) {
                 detail::memory_pool_check_memory_leak(
@@ -64,7 +49,36 @@ public:
             for (auto b : _blocks) {
                 detail::allocator_deallocate(b, alignof(T));
             }
+            _blocks.clear();
         }
+    }
+
+public:
+    /**
+     * @brief Construct a new Pool object.
+     * default constructor 
+     */
+    Pool() noexcept = default;
+    Pool(Pool &&rhs) noexcept
+        : _blocks{std::move(rhs._blocks)},
+          _available_objects{std::move(rhs._available_objects)} {
+    }
+    Pool(const Pool &) noexcept = delete;
+
+    Pool &operator=(Pool &&rhs) noexcept {
+        _dispose();
+        _blocks = std::move(rhs._blocks);
+        _available_objects = std::move(rhs._available_objects);
+        return *this;
+    }
+    Pool &operator=(const Pool &) noexcept = default;
+
+    /**
+     * @brief Destroy the Pool object.
+     * detect leaking
+     */
+    ~Pool() noexcept {
+        _dispose();
     }
 
     [[nodiscard]] auto allocate() noexcept {
@@ -90,6 +104,7 @@ public:
      * @return pointer to constructed object
      */
     template<typename... Args>
+    requires(luisa::is_constructible_v<T, Args&&...>)
     [[nodiscard]] auto create(Args &&...args) noexcept {
         auto p = allocate();
         return std::construct_at(p, std::forward<Args>(args)...);
@@ -108,4 +123,3 @@ public:
 };
 
 }// namespace luisa
-

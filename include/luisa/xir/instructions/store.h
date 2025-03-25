@@ -21,7 +21,7 @@ public:
     void set_variable(Value *variable) noexcept;
     void set_value(Value *value) noexcept;
 
-    [[nodiscard]] StoreInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] StoreInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

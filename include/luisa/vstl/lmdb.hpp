@@ -40,8 +40,8 @@ struct LC_VSTL_API LMDBIterator {
     LMDBIterator(LMDBIterator &&rhs) noexcept;
     LMDBIterator &operator=(LMDBIterator const &) = delete;
     LMDBIterator &operator=(LMDBIterator &&rhs) noexcept {
-        this->~LMDBIterator();
-        new (std::launder(this)) LMDBIterator{std::move(rhs)};
+        std::destroy_at(this);
+        std::construct_at(this, std::move(rhs));
         return *this;
     }
     ~LMDBIterator() noexcept;
@@ -72,8 +72,8 @@ public:
     LMDB &operator=(LMDB const &) = delete;
     LMDB(LMDB &&rhs) noexcept;
     LMDB &operator=(LMDB &&rhs) noexcept {
-        this->~LMDB();
-        new (std::launder(this)) LMDB{std::move(rhs)};
+        std::destroy_at(this);
+        std::construct_at(this, std::move(rhs));
         return *this;
     }
     [[nodiscard]] luisa::span<const std::byte> read(luisa::span<const std::byte> key) const noexcept;

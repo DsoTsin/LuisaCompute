@@ -52,7 +52,7 @@ void CallInst::remove_argument(size_t index) noexcept {
     remove_operand(operand_index_argument_offset + index);
 }
 
-CallInst *CallInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+CallInst *CallInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_callee = resolver.resolve(callee());
     LUISA_DEBUG_ASSERT(resolved_callee == nullptr || resolved_callee->isa<Function>(), "Invalid callee.");
     luisa::fixed_vector<Value *, 16u> resolved_args;

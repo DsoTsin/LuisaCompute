@@ -195,7 +195,7 @@ void Shader::SavePSO(ID3D12PipelineState *pso, vstd::string_view psoName, luisa:
 };
 vstd::string Shader::PSOName(Device const *device, vstd::string_view fileName) {
     vstd::fixed_vector<uint8_t, 64> data;
-    data.push_back_uninitialized(16 + fileName.size());
+    luisa::enlarge_by(data, 16 + fileName.size());
     std::memcpy(data.data(), &device->adapterID, 16);
     std::memcpy(data.data() + 16, fileName.data(), fileName.size());
     vstd::MD5 hash{data};

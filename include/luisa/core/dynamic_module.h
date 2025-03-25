@@ -11,13 +11,15 @@ namespace luisa {
  * @brief Dynamic module loader
  *
  */
+class MemorySanitizer;
 class LC_CORE_API DynamicModule : concepts::Noncopyable {
-
+    friend ::luisa::MemorySanitizer;
 private:
     void *_handle{nullptr};
 
 private:
     explicit DynamicModule(void *handle) noexcept : _handle{handle} {}
+    static void reset_search_paths() noexcept;
 
 public:
     [[nodiscard]] explicit operator bool() const noexcept { return _handle != nullptr; }

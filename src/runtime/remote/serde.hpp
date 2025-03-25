@@ -19,7 +19,7 @@ template<typename T>
 inline void SerDe::ser_value(T const &t, luisa::vector<std::byte> &vec) noexcept {
     static_assert(std::is_trivially_destructible_v<T> && !std::is_pointer_v<T>);
     auto last_len = vec.size();
-    vec.push_back_uninitialized(sizeof(T));
+    luisa::enlarge_by(vec, sizeof(T));
     memcpy(vec.data() + last_len, &t, sizeof(T));
 }
 template<typename T>
@@ -34,7 +34,7 @@ template<>
 inline void SerDe::ser_value(luisa::string_view const &t, luisa::vector<std::byte> &vec) noexcept {
     ser_value(t.size(), vec);
     auto last_len = vec.size();
-    vec.push_back_uninitialized(t.size());
+    luisa::enlarge_by(vec, t.size());
     memcpy(vec.data() + last_len, t.data(), t.size());
 }
 template<>

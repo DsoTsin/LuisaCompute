@@ -194,7 +194,7 @@ static void forward_single_store_to_loads_on_function(FunctionDefinition *functi
             // reverse the indices to the correct order
             std::reverse(extract_args.begin(), extract_args.end());
             // create the extract instruction
-            Builder builder;
+            XIRBuilder builder;
             builder.set_insertion_point(load);
             return builder.call(load->type(), ArithmeticOp::EXTRACT, extract_args);
         }();

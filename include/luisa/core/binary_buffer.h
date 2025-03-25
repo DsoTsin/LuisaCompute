@@ -2,6 +2,7 @@
 
 #include <luisa/core/stl/vector.h>
 #include <luisa/core/stl/memory.h>
+#include <luisa/core/intrin.h>
 
 namespace luisa {
 

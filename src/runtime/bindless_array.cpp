@@ -44,7 +44,7 @@ void BindlessArray::emplace_buffer_handle_on_update(size_t index, uint64_t handl
             index, _size);
     }
     auto [iter, _] = _updates.emplace(index);
-    iter->buffer = Modification::Buffer::emplace(handle, offset_bytes);
+    const_cast<Modification::Buffer &>(iter->buffer) = Modification::Buffer::emplace(handle, offset_bytes);
 }
 
 void BindlessArray::emplace_tex2d_handle_on_update(size_t index, uint64_t handle, Sampler sampler) noexcept {
@@ -56,7 +56,7 @@ void BindlessArray::emplace_tex2d_handle_on_update(size_t index, uint64_t handle
             index, _size);
     }
     auto [iter, _] = _updates.emplace(index);
-    iter->tex2d = Modification::Texture::emplace(handle, sampler);
+    const_cast<Modification::Texture &>(iter->tex2d) = Modification::Texture::emplace(handle, sampler);
 }
 
 void BindlessArray::emplace_tex3d_handle_on_update(size_t index, uint64_t handle, Sampler sampler) noexcept {
@@ -68,7 +68,7 @@ void BindlessArray::emplace_tex3d_handle_on_update(size_t index, uint64_t handle
             index, _size);
     }
     auto [iter, _] = _updates.emplace(index);
-    iter->tex3d = Modification::Texture::emplace(handle, sampler);
+    const_cast<Modification::Texture &>(iter->tex3d) = Modification::Texture::emplace(handle, sampler);
 }
 
 BindlessArray &BindlessArray::remove_buffer_on_update(size_t index) noexcept {
@@ -80,7 +80,7 @@ BindlessArray &BindlessArray::remove_buffer_on_update(size_t index) noexcept {
             index, _size);
     }
     auto [iter, _] = _updates.emplace(index);
-    iter->buffer = Modification::Buffer::remove();
+    const_cast<Modification::Buffer &>(iter->buffer) = Modification::Buffer::remove();
     return *this;
 }
 
@@ -93,7 +93,7 @@ BindlessArray &BindlessArray::remove_tex2d_on_update(size_t index) noexcept {
             index, _size);
     }
     auto [iter, _] = _updates.emplace(index);
-    iter->tex2d = Modification::Texture::remove();
+    const_cast<Modification::Texture &>(iter->tex2d) = Modification::Texture::remove();
     return *this;
 }
 
@@ -106,7 +106,7 @@ BindlessArray &BindlessArray::remove_tex3d_on_update(size_t index) noexcept {
             index, _size);
     }
     auto [iter, _] = _updates.emplace(index);
-    iter->tex3d = Modification::Texture::remove();
+    const_cast<Modification::Texture &>(iter->tex3d) = Modification::Texture::remove();
     return *this;
 }
 

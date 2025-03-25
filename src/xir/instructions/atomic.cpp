@@ -7,7 +7,7 @@ namespace luisa::compute::xir {
 AtomicInst::AtomicInst(BasicBlock *parent_block, const Type *type, AtomicOp op,
                        Value *base, luisa::span<Value *const> indices,
                        luisa::span<Value *const> values) noexcept
-    : Super{parent_block, type}, InstructionOpMixin{op} {
+    : Super{op, parent_block, type} {
     auto expected_value_count = this->value_count();
     LUISA_DEBUG_ASSERT(values.empty() || values.size() == expected_value_count,
                        "Invalid number of values for atomic instruction.");
@@ -51,7 +51,7 @@ void AtomicInst::set_values(luisa::span<Value *const> values) noexcept {
     }
 }
 
-AtomicInst *AtomicInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+AtomicInst *AtomicInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_base = resolver.resolve(base());
     luisa::fixed_vector<Value *, 16u> resolved_indices;
     resolved_indices.reserve(index_count());

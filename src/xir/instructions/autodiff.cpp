@@ -31,7 +31,7 @@ const BasicBlock *AutodiffScopeInst::entry_block() const noexcept {
     return const_cast<AutodiffScopeInst *>(this)->entry_block();
 }
 
-AutodiffScopeInst *AutodiffScopeInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+AutodiffScopeInst *AutodiffScopeInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto cloned = b.autodiff_scope();
     auto resolved_entry_block = resolver.resolve(entry_block());
     LUISA_DEBUG_ASSERT(resolved_entry_block == nullptr || resolved_entry_block->isa<BasicBlock>(), "Invalid entry block.");
@@ -44,9 +44,9 @@ AutodiffScopeInst *AutodiffScopeInst::clone(Builder &b, InstructionCloneValueRes
 
 AutodiffIntrinsicInst::AutodiffIntrinsicInst(BasicBlock *parent_block, const Type *type, AutodiffIntrinsicOp op,
                                              luisa::span<Value *const> operands) noexcept
-    : Super{parent_block, type}, InstructionOpMixin{op} { set_operands(operands); }
+    : Super{op, parent_block, type} { set_operands(operands); }
 
-AutodiffIntrinsicInst *AutodiffIntrinsicInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+AutodiffIntrinsicInst *AutodiffIntrinsicInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     luisa::fixed_vector<Value *, 16u> resolved_operands;
     resolved_operands.reserve(operand_count());
     for (auto op_use : operand_uses()) {

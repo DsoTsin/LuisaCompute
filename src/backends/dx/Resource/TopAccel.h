@@ -1,6 +1,5 @@
 #pragma once
 #include <DXRuntime/Device.h>
-#include <EASTL/shared_ptr.h>
 #include <luisa/runtime/rhi/command.h>
 #include <luisa/runtime/device.h>
 #include <Resource/Resource.h>
@@ -34,6 +33,7 @@ class TopAccel : public Resource {
         MeshHandle *handle = nullptr;
     };
     vstd::vector<Instance> allInstance;
+    void ResizeAllInstance(size_t size);
     vstd::unordered_map<uint64, MeshHandle *> setMap;
     vstd::vector<PackedModifier> setDesc;
     void SetMesh(BottomAccel *mesh, uint64 index);

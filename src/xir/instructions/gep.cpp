@@ -40,7 +40,7 @@ void GEPInst::remove_index(size_t i) noexcept {
     remove_operand(operand_index_index_offset + i);
 }
 
-GEPInst *GEPInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+GEPInst *GEPInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_base = resolver.resolve(base());
     luisa::fixed_vector<Value *, 16u> resolved_indices;
     resolved_indices.reserve(index_count());

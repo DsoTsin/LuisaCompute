@@ -14,6 +14,7 @@
 #include <luisa/core/stl/functional.h>
 #include <luisa/core/magic_enum.h>
 #include <luisa/rust/api_types.h>
+#include <iostream>
 
 namespace luisa {
 

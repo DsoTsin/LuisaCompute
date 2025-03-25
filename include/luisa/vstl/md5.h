@@ -4,7 +4,7 @@ namespace vstd {
 static constexpr size_t MD5_SIZE = 16;
 
 LC_VSTL_API std::array<uint8_t, MD5_SIZE> GetMD5FromString(string const &str);
-LC_VSTL_API std::array<uint8_t, MD5_SIZE> GetMD5FromArray(eastl::span<uint8_t> data);
+LC_VSTL_API std::array<uint8_t, MD5_SIZE> GetMD5FromArray(luisa::span<uint8_t> data);
 //Used for unity
 class LC_VSTL_API MD5 {
 public:

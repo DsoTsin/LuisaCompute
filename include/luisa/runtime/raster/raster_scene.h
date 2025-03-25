@@ -1,13 +1,16 @@
 #pragma once
+
 #include <luisa/backends/ext/raster_ext_interface.h>
 #include <luisa/runtime/buffer.h>
 #include <luisa/core/spin_mutex.h>
 #include <luisa/runtime/raster/raster_state.h>
 #include <luisa/runtime/raster/raster_shader.h>
 #include <luisa/runtime/raster/depth_buffer.h>
+
 namespace lc::validation {
 class Stream;
 }// namespace lc::validation
+
 namespace luisa::compute {
 
 class VertexBufferView {
@@ -41,6 +44,7 @@ public:
     }
     VertexBufferView() noexcept = default;
 };
+
 class RasterMesh {
     friend class lc::validation::Stream;
     luisa::fixed_vector<VertexBufferView, 4> _vertex_buffers{};
@@ -66,7 +70,7 @@ public:
           _instance_count(instance_count),
           _object_id(object_id),
           _vertex_offset(vertex_offset) {
-        _vertex_buffers.push_back_uninitialized(vertex_buffers.size());
+        luisa::enlarge_by(_vertex_buffers, vertex_buffers.size());
         std::memcpy(_vertex_buffers.data(), vertex_buffers.data(), vertex_buffers.size_bytes());
     }
     RasterMesh() noexcept = default;
@@ -84,8 +88,9 @@ public:
           _instance_count(instance_count),
           _object_id(object_id),
           _vertex_offset(vertex_offset) {
-        _vertex_buffers.push_back_uninitialized(vertex_buffers.size());
+        luisa::enlarge_by(_vertex_buffers, vertex_buffers.size());
         std::memcpy(_vertex_buffers.data(), vertex_buffers.data(), vertex_buffers.size_bytes());
     }
 };
+
 }// namespace luisa::compute

@@ -4,6 +4,7 @@
 #include <luisa/runtime/image.h>
 #include <luisa/runtime/device.h>
 #include <luisa/runtime/volume.h>
+#include <luisa/vstl/meta_lib.h>
 #include <luisa/backends/ext/native_resource_ext.hpp>
 #ifndef NDEBUG
 #include <luisa/core/logging.h>
@@ -52,7 +53,7 @@ public:
     DxCudaTimelineEvent &operator=(DxCudaTimelineEvent const &) = delete;
     DxCudaTimelineEvent &operator=(DxCudaTimelineEvent &&rhs) noexcept {
         this->~DxCudaTimelineEvent();
-        new (std::launder(this)) DxCudaTimelineEvent{std::move(rhs)};
+        vstd::construct_at(this, std::move(rhs));
         return *this;
     }
     [[nodiscard]] auto signal(uint64_t fence) noexcept {

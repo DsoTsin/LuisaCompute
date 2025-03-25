@@ -21,7 +21,7 @@ void LoadInst::set_variable(Value *variable) noexcept {
     return set_operand(0, variable);
 }
 
-LoadInst *LoadInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+LoadInst *LoadInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_variable = resolver.resolve(variable());
     return b.load(type(), resolved_variable);
 }

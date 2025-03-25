@@ -23,8 +23,8 @@ public:
     char *data() { return vec.data(); }
     char const &operator[](size_t i) const { return vec[i]; }
     char &operator[](size_t i) { return vec[i]; }
-    void resize(size_t size) { vec.resize_uninitialized(size); }
-    void push_back(size_t size) { vec.push_back_uninitialized(size); }
+    void resize(size_t size) { luisa::vector_resize(vec, size); }
+    void push_back(size_t size) { luisa::enlarge_by(vec, size); }
     void reserve(size_t capacity) { vec.reserve(capacity); }
     size_t size() const { return vec.size(); }
 

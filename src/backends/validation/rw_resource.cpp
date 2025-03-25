@@ -17,7 +17,7 @@ static ResMap res_map;
 RWResource::RWResource(uint64_t handle, Tag tag, bool non_simultaneous)
     : Resource{tag}, _non_simultaneous{non_simultaneous}, _handle{handle} {
     std::lock_guard lck{mtx};
-    res_map.map.force_emplace(handle, this);
+    res_map.map[handle] = this;
 }
 void RWResource::set_usage(Stream *stream, RWResource *res, Usage usage, Range range) {
     std::lock_guard lck{mtx};

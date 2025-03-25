@@ -107,6 +107,15 @@ public:
     [[nodiscard]] size_t type_count() const noexcept;
     /// Traverse all types using visitor
     void traverse(TypeVisitor &visitor) const noexcept;
+
+    static void reset() noexcept {
+        for (auto t : instance()._types) {
+            std::destroy_at(t);
+        }
+        instance()._type_pool = luisa::Pool<TypeImpl, false, false>{};
+        instance()._type_set = luisa::unordered_set<const TypeImpl *, TypeHash>{};
+        instance()._types = luisa::vector<TypeImpl *>{};
+    }
 };
 
 const Type *TypeRegistry::decode_type(luisa::string_view desc) noexcept {
@@ -730,6 +739,10 @@ bool Type::is_uint64_vector() const noexcept { return is_vector() && element()->
 
 bool Type::is_resource() const noexcept {
     return is_buffer() || is_texture() || is_bindless_array() || is_accel();
+}
+
+void Type::reset_type_registry() noexcept {
+    ::luisa::compute::detail::TypeRegistry::reset();
 }
 
 }// namespace luisa::compute

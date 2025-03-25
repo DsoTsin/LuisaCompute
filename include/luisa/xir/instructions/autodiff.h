@@ -15,27 +15,14 @@ public:
     BasicBlock *create_entry_block(bool overwrite_existing = false) noexcept;
     [[nodiscard]] BasicBlock *entry_block() noexcept;
     [[nodiscard]] const BasicBlock *entry_block() const noexcept;
-    [[nodiscard]] AutodiffScopeInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] AutodiffScopeInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
-enum struct AutodiffIntrinsicOp {
-    AUTODIFF_REQUIRES_GRADIENT,  // (expr) -> void
-    AUTODIFF_GRADIENT,           // (expr) -> expr
-    AUTODIFF_GRADIENT_MARKER,    // (ref, expr) -> void
-    AUTODIFF_ACCUMULATE_GRADIENT,// (ref, expr) -> void
-    AUTODIFF_BACKWARD,           // (expr) -> void
-    AUTODIFF_DETACH,             // (expr) -> expr
-};
-
-[[nodiscard]] LC_XIR_API luisa::string_view to_string(AutodiffIntrinsicOp op) noexcept;
-[[nodiscard]] LC_XIR_API AutodiffIntrinsicOp intrinsic_op_from_string(luisa::string_view name) noexcept;
-
-class LC_XIR_API AutodiffIntrinsicInst final : public DerivedInstruction<AutodiffIntrinsicInst, DerivedInstructionTag::AUTODIFF_INTRINSIC>,
-                                               public InstructionOpMixin<AutodiffIntrinsicOp> {
+class LC_XIR_API AutodiffIntrinsicInst final : public InstructionOpMixin<AutodiffIntrinsicOp, DerivedInstruction<AutodiffIntrinsicInst, DerivedInstructionTag::AUTODIFF_INTRINSIC>> {
 public:
     AutodiffIntrinsicInst(BasicBlock *parent_block, const Type *type, AutodiffIntrinsicOp op,
                           luisa::span<Value *const> operands = {}) noexcept;
-    [[nodiscard]] AutodiffIntrinsicInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] AutodiffIntrinsicInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

@@ -243,8 +243,9 @@ AccessChain const &CodegenStackData::GetAtomicFunc(
         exprs.subspan(0, exprs.size() - extra_arg_size)};
     auto iter = atomicsFuncs.emplace(std::move(chain));
     if (iter.second) {
-        iter.first->init_name();
-        iter.first->gen_func_impl(util, tmp, exprs.subspan(exprs.size() - extra_arg_size, extra_arg_size), *incrementalFunc);
+        auto &access_chain = const_cast<AccessChain &>(*iter.first);
+        access_chain.init_name();
+        access_chain.gen_func_impl(util, tmp, exprs.subspan(exprs.size() - extra_arg_size, extra_arg_size), *incrementalFunc);
     }
     return *iter.first;
 }

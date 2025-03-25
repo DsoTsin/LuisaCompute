@@ -20,7 +20,7 @@ static void trace_gep_chain(Instruction *inst, luisa::fixed_vector<Value *, 16u>
         case DerivedInstructionTag::GEP: {
             auto gep_inst = static_cast<GEPInst *>(inst);
             auto index_uses = gep_inst->index_uses();
-            for (auto it = index_uses.crbegin(); it != index_uses.crend(); ++it) {
+            for (auto it = index_uses.rbegin(); it != index_uses.rend(); ++it) {
                 LUISA_DEBUG_ASSERT((*it)->value() != nullptr, "Invalid GEP index.");
                 chain.emplace_back((*it)->value());
             }
@@ -44,7 +44,7 @@ static void trace_gep_chain(Instruction *inst, luisa::fixed_vector<Value *, 16u>
 static void transpose_load_gep(LoadInst *load, TransposeGEPInfo &info) noexcept {
     LUISA_DEBUG_ASSERT(load->variable()->isa<Instruction>(), "Invalid pointer.");
     auto gep_chain = trace_gep_chain(static_cast<Instruction *>(load->variable()));
-    Builder b;
+    XIRBuilder b;
     b.set_insertion_point(load);
     auto alloca_inst = gep_chain.front();
     auto alloca_load = b.load(alloca_inst->type(), alloca_inst);
@@ -59,7 +59,7 @@ static void transpose_load_gep(LoadInst *load, TransposeGEPInfo &info) noexcept 
 static void transpose_store_gep(StoreInst *store, TransposeGEPInfo &info) noexcept {
     LUISA_DEBUG_ASSERT(store->variable()->isa<Instruction>(), "Invalid pointer.");
     auto gep_chain = trace_gep_chain(static_cast<Instruction *>(store->variable()));
-    Builder b;
+    XIRBuilder b;
     b.set_insertion_point(store);
     auto alloca_inst = gep_chain.front();
     auto alloca_load = b.load(alloca_inst->type(), alloca_inst);

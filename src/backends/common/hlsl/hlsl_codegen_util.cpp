@@ -79,7 +79,7 @@ vstd::string_view CodegenUtility::ReadInternalHLSLFile(vstd::string_view name) {
         std::lock_guard lck{v.mtx};
         if (v.result.empty()) {
             auto compressed = lc_hlsl::get_hlsl_builtin(name);
-            v.result.push_back_uninitialized(compressed.uncompressed_size);
+            luisa::enlarge_by(v.result, compressed.uncompressed_size);
             uLong dest_len = compressed.uncompressed_size;
             auto r = uncompress((Bytef *)v.result.data(), &dest_len, (Bytef const *)compressed.ptr, compressed.compressed_size);
             if (r != Z_OK) [[unlikely]] {
@@ -2054,7 +2054,7 @@ vstd::MD5 CodegenUtility::GetTypeMD5(vstd::span<Type const *const> types) {
         else
             typeDescs.emplace_back(i->hash());
     }
-    return {vstd::span<uint8_t const>(reinterpret_cast<uint8_t const *>(typeDescs.data()), typeDescs.size_bytes())};
+    return {vstd::span<uint8_t const>(reinterpret_cast<uint8_t const *>(typeDescs.data()), luisa::size_bytes(typeDescs))};
 }
 vstd::MD5 CodegenUtility::GetTypeMD5(std::initializer_list<vstd::IRange<Variable> *> f) {
     vstd::vector<uint64_t> typeDescs;
@@ -2070,7 +2070,7 @@ vstd::MD5 CodegenUtility::GetTypeMD5(std::initializer_list<vstd::IRange<Variable
                 typeDescs.emplace_back(type->hash());
         }
     }
-    return {vstd::span<uint8_t const>(reinterpret_cast<uint8_t const *>(typeDescs.data()), typeDescs.size_bytes())};
+    return {vstd::span<uint8_t const>(reinterpret_cast<uint8_t const *>(typeDescs.data()), luisa::size_bytes(typeDescs))};
 }
 vstd::MD5 CodegenUtility::GetTypeMD5(Function func) {
     vstd::vector<uint64_t> typeDescs;
@@ -2086,7 +2086,7 @@ vstd::MD5 CodegenUtility::GetTypeMD5(Function func) {
         else
             typeDescs.emplace_back(type->hash());
     }
-    return {vstd::span<uint8_t const>(reinterpret_cast<uint8_t const *>(typeDescs.data()), typeDescs.size_bytes())};
+    return {vstd::span<uint8_t const>(reinterpret_cast<uint8_t const *>(typeDescs.data()), luisa::size_bytes(typeDescs))};
 }
 CodegenUtility::CodegenUtility() {
     attributes.try_emplace("position", "POSITION", nullptr);

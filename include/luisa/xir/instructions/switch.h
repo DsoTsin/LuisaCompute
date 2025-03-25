@@ -59,7 +59,7 @@ public:
     [[nodiscard]] BasicBlock *default_block() noexcept;
     [[nodiscard]] const BasicBlock *default_block() const noexcept;
 
-    [[nodiscard]] SwitchInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] SwitchInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

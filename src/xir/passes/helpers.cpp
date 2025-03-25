@@ -16,7 +16,7 @@ Value *trace_pointer_base_value(Value *pointer) noexcept {
 AllocaInst *trace_pointer_base_local_alloca_inst(Value *pointer) noexcept {
     if (auto base = trace_pointer_base_value(pointer);
         base != nullptr && base->isa<AllocaInst>() &&
-        static_cast<AllocaInst *>(base)->space() == AllocSpace::LOCAL) {
+        static_cast<AllocaInst *>(base)->op() == AllocaOp::LOCAL) {
         return static_cast<AllocaInst *>(base);
     }
     return nullptr;
@@ -68,7 +68,7 @@ void lower_phi_node_to_local_variable(PhiInst *phi) noexcept {
     if (!remove_redundant_phi_instruction(phi)) {
         auto f = phi->parent_function();
         LUISA_DEBUG_ASSERT(f != nullptr && f->definition() != nullptr, "Invalid function.");
-        Builder b;
+        XIRBuilder b;
         // create alloca at the beginning of the function
         b.set_insertion_point(f->definition()->body_block()->instructions().head_sentinel());
         auto phi_alloca = b.alloca_local(phi->type());
@@ -98,7 +98,7 @@ void hoist_alloca_instructions_to_entry_block(FunctionDefinition *f) noexcept {
         }
     });
     if (!collected.empty()) {
-        Builder b;
+        XIRBuilder b;
         b.set_insertion_point(f->body_block()->instructions().head_sentinel());
         for (auto inst : collected) {
             inst->remove_self();

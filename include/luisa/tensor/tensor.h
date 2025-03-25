@@ -1,17 +1,77 @@
-#pragma
+#pragma once
 #include <luisa/core/dll_export.h>
 #include <luisa/core/stl/memory.h>
-#include <luisa/dsl/syntax.h>
-namespace luisa::compute::tensor {
-class LC_TENSOR_API JitSession {
-    class Impl;
+#include <luisa/core/pool.h>
+#include <luisa/runtime/buffer.h>
+#include <luisa/runtime/byte_buffer.h>
+namespace luisa::compute {
+
+enum struct TensorElementType : uint8_t {
+    Float16,
+    Float32,
+    Float64,
+};
+class LC_TENSOR_API TensorData {
+    luisa::span<size_t const> _sizes;
+    TensorElementType _type;
+    uint64_t _idx;
+    size_t _size_bytes;
+
 public:
-    // TODO: move to private
-    JitSession() noexcept;
-    JitSession &get() noexcept;
-    Stream &stream() noexcept;
+    TensorData(luisa::span<size_t const> sizes,
+               TensorElementType element_type,
+               uint64_t uid) noexcept;
+    TensorData(TensorData &&rhs) noexcept;
+
+    TensorData(TensorData const &rhs) = delete;
+
+    [[nodiscard]] uint64_t idx() const noexcept {
+        return _idx;
+    }
+    [[nodiscard]] size_t get_size(uint dimension) const noexcept {
+        if (dimension >= _sizes.size()) return 1;
+        return _sizes[dimension];
+    }
+    [[nodiscard]] size_t dimension() const noexcept {
+        return _sizes.size();
+    }
+    [[nodiscard]] size_t size_bytes() const noexcept {
+        return _size_bytes;
+    }
+    [[nodiscard]] TensorElementType element_type() const noexcept {
+        return _type;
+    }
 };
 
+class TensorBuilder;
+
+class LC_TENSOR_API Tensor {
+    friend class TensorBuilder;
+
+    TensorData *_data;
+    bool _contained;
+    Tensor(TensorData *data,
+           bool contained) noexcept;
+
+public:
+    explicit Tensor(TensorData *data) noexcept : Tensor(data, false) {}
+    Tensor(Tensor &&rhs) noexcept;
+    ~Tensor() noexcept;
+    Tensor &operator=(Tensor &&rhs) noexcept {
+        if (&rhs == this) [[unlikely]]
+            return *this;
+        std::destroy_at(this);
+        new (this) Tensor(std::move(rhs));
+    }
+    [[nodiscard]] auto data() const noexcept { return _data; }
+    void dispose() noexcept;
+
+    // TODO: arithmetic
+    // Tensor operator*(Tensor const &rhs) const noexcept;
+    // Tensor &operator*=(Tensor const &rhs) noexcept;
+    // Tensor operator+(Tensor const &rhs) const noexcept;
+    // Tensor &operator+=(Tensor const &rhs) noexcept;
+};
 
 // class DTensor {
 //     Device &device;
@@ -75,4 +135,4 @@ public:
 //     // TODO: implement
 // }
 
-}// namespace luisa::compute::tensor
+}// namespace luisa::compute

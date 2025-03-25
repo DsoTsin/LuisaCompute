@@ -4,7 +4,7 @@
 namespace luisa::compute::xir {
 
 AssertInst::AssertInst(BasicBlock *parent_block, Value *condition, luisa::string message) noexcept
-    : Super{parent_block, nullptr}, _message{std::move(message)} {
+    : Super{std::move(message), parent_block, nullptr} {
     set_operands(std::array{condition});
 }
 
@@ -20,17 +20,9 @@ const Value *AssertInst::condition() const noexcept {
     return operand(operand_index_condition);
 }
 
-void AssertInst::set_message(luisa::string_view message) noexcept {
-    _message = message;
-}
-
-luisa::string_view AssertInst::message() const noexcept {
-    return _message;
-}
-
-AssertInst *AssertInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+AssertInst *AssertInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_cond = resolver.resolve(condition());
-    return b.assert_(resolved_cond, _message);
+    return b.assert_(resolved_cond, message());
 }
 
 }// namespace luisa::compute::xir

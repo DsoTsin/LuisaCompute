@@ -157,7 +157,7 @@ static BasicBlock *duplicate_basic_block_for_ray_query_loop_dispatch_branch(cons
                                                                             luisa::vector<std::pair<const PhiInst *, PhiInst *>> &phi_nodes,
                                                                             RayQueryLowerPassValueResolver &resolver) noexcept {
     auto bb = static_cast<BasicBlock *>(resolver.resolve(original));
-    Builder b;
+    XIRBuilder b;
     b.set_insertion_point(bb);
     for (auto &&inst : original->instructions()) {
         // special case: branch to the merge block
@@ -219,7 +219,7 @@ static BasicBlock *duplicate_basic_block_for_ray_query_loop_dispatch_branch(cons
             LUISA_ASSERT(!already_returned, "Multiple return instructions in the branch block.");
             already_returned = true;
             // generate store instructions for out values
-            Builder b;
+            XIRBuilder b;
             b.set_insertion_point(bb->terminator()->prev());
             for (auto out_value : capture_list.out_values) {
                 auto out_arg = function->create_reference_argument(out_value->type());
@@ -266,7 +266,7 @@ static void lower_ray_query_loop(Function *function, RayQueryLoopInst *loop, Ray
     }
     // create variables for out values
     if (!capture_list.out_values.empty()) {
-        Builder b;
+        XIRBuilder b;
         b.set_insertion_point(&function->definition()->body_block()->instructions().front());
         for (auto out_value : capture_list.out_values) {
             auto variable = b.alloca_local(out_value->type());
@@ -275,7 +275,7 @@ static void lower_ray_query_loop(Function *function, RayQueryLoopInst *loop, Ray
         }
     }
     // create ray query pipeline
-    Builder b;
+    XIRBuilder b;
     b.set_insertion_point(loop->prev());
     auto pipeline = b.ray_query_pipeline(subgraph.query_object, on_surface, on_procedural, captured_args);
     // load the out values and replace the uses
@@ -323,7 +323,7 @@ static void replace_phi_uses_with_local_load_in_blocks(BasicBlock *block, PhiIns
             }
         }
         if (!local_uses.empty()) {
-            Builder b;
+            XIRBuilder b;
             b.set_insertion_point(block->instructions().head_sentinel());
             auto phi_load = b.load(phi->type(), phi_alloca);
             phi_load->add_comment("load from phi alloca");
@@ -369,7 +369,7 @@ static void lower_phi_nodes_in_loop_dispatch_block(FunctionDefinition *f, RayQue
         collect_blocks_in_ray_query_dispatch_branch(surface_block, dispatch_block, surface_blocks);
         collect_blocks_in_ray_query_dispatch_branch(procedural_block, dispatch_block, procedural_blocks);
         // lower the phi nodes to local variables
-        Builder b;
+        XIRBuilder b;
         for (auto phi : phi_nodes) {
             b.set_insertion_point(f->body_block()->instructions().head_sentinel());
             auto phi_alloca = b.alloca_local(phi->type());

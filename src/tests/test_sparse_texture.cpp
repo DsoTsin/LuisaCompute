@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
             << write_shader(image, make_uint2(0)).dispatch(resolution)
             << image.copy_to(pinned.data()) << sparse_cmdlist.commit()
             << [&]() {
-                   auto file = dstorage_ext->pin_memory(pinned.data(), pinned.size_bytes());
+                   auto file = dstorage_ext->pin_memory(pinned.data(), luisa::size_bytes(pinned));
                    dstorage_stream << file.copy_to(sparse_image, pixel_offset / sparse_image.tile_size(), resolution / sparse_image.tile_size(), 0) << event.signal() << [f = std::move(file)] {};
                }
             << synchronize() << event.wait() << write_sparse_shader(sparse_image.view(), image, make_float2(pixel_offset) / make_float2(virtual_resolution), make_float2(resolution) / make_float2(virtual_resolution)).dispatch(resolution) << image.copy_to(result.data()) << synchronize();

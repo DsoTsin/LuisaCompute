@@ -69,7 +69,7 @@ CUDAStream::CUDAStream(CUDADevice *device) noexcept
         *_callback_semaphore = 0u;
     }
     // create the stream
-    LUISA_CHECK_CUDA(cuStreamCreate(&_stream, CU_STREAM_NON_BLOCKING));
+    LUISA_CHECK_CUDA(cuStreamCreate(&_stream, CU_STREAM_DEFAULT));
     // create the callback thread
     _callback_thread = std::thread{[this] {
         for (;;) {

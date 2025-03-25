@@ -5,7 +5,7 @@
 #include <luisa/core/stl/functional.h>
 #include <luisa/core/stl/hash.h>
 
-#ifndef LUISA_COMPUTE_USE_DENSE_MAP
+#if !defined(LUISA_USE_SYSTEM_STL) && !defined(LUISA_COMPUTE_USE_DENSE_MAP)
 #define LUISA_COMPUTE_USE_DENSE_MAP 1
 #endif
 
@@ -37,16 +37,14 @@ using unordered_set = ankerl::unordered_dense::set<
 #else
 
 template<typename K, typename V,
-         typename Hash = hash<K>,
+         typename Hash = luisa::hash<K>,
          typename Eq = equal_to<>>
-using unordered_map = std::unordered_map<
-    K, V, Hash, Eq, allocator<std::pair<const K, V>>>;
+using unordered_map = std::unordered_map<K, V, Hash, Eq>;
 
 template<typename K,
-         typename Hash = hash<K>,
+         typename Hash = luisa::hash<K>,
          typename Eq = equal_to<>>
-using unordered_set = std::unordered_set<
-    K, Hash, Eq, allocator<K>>;
+using unordered_set = std::unordered_set<K, Hash, Eq>;
 
 #endif
 

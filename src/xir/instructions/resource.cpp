@@ -5,9 +5,9 @@ namespace luisa::compute::xir {
 
 ResourceQueryInst::ResourceQueryInst(BasicBlock *parent_block, const Type *type, ResourceQueryOp op,
                                      luisa::span<Value *const> operands) noexcept
-    : Super{parent_block, type}, InstructionOpMixin{op} { set_operands(operands); }
+    : Super{op, parent_block, type} { set_operands(operands); }
 
-ResourceQueryInst *ResourceQueryInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+ResourceQueryInst *ResourceQueryInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     luisa::fixed_vector<Value *, 8u> cloned_operands;
     cloned_operands.reserve(operand_count());
     for (auto op_use : operand_uses()) {
@@ -18,9 +18,9 @@ ResourceQueryInst *ResourceQueryInst::clone(Builder &b, InstructionCloneValueRes
 
 ResourceReadInst::ResourceReadInst(BasicBlock *parent_block, const Type *type, ResourceReadOp op,
                                    luisa::span<Value *const> operands) noexcept
-    : Super{parent_block, type}, InstructionOpMixin{op} { set_operands(operands); }
+    : Super{op, parent_block, type} { set_operands(operands); }
 
-ResourceReadInst *ResourceReadInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+ResourceReadInst *ResourceReadInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     luisa::fixed_vector<Value *, 8u> cloned_operands;
     cloned_operands.reserve(operand_count());
     for (auto op_use : operand_uses()) {
@@ -31,9 +31,9 @@ ResourceReadInst *ResourceReadInst::clone(Builder &b, InstructionCloneValueResol
 
 ResourceWriteInst::ResourceWriteInst(BasicBlock *parent_block, ResourceWriteOp op,
                                      luisa::span<Value *const> operands) noexcept
-    : Super{parent_block, nullptr}, InstructionOpMixin{op} { set_operands(operands); }
+    : Super{op, parent_block, nullptr} { set_operands(operands); }
 
-ResourceWriteInst *ResourceWriteInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+ResourceWriteInst *ResourceWriteInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     luisa::fixed_vector<Value *, 8u> cloned_operands;
     cloned_operands.reserve(operand_count());
     for (auto op_use : operand_uses()) {

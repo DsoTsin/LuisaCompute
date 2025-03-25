@@ -73,8 +73,7 @@ template<typename T>
 constexpr bool is_valid_buffer_element_v =
     std::is_same_v<T, std::remove_cvref_t<T>> &&
     std::is_trivially_copyable_v<T> &&
-    std::is_trivially_destructible_v<T> &&
-    (alignof(T) >= 4u);
+    std::is_trivially_destructible_v<T>;
 
 // Buffer is a one-dimensional data structure that can be of any base data type, such as int, float2, struct or array
 template<typename T>

@@ -16,6 +16,9 @@
 
 // Runtime depends on AST but this file is header only.
 #include <luisa/runtime/rhi/curve_basis.h>
+namespace luisa {
+class MemorySanitizer;
+}// namespace luisa
 
 namespace lc::validation {
 class Device;
@@ -39,6 +42,7 @@ class FunctionDuplicator;
  */
 class LC_AST_API FunctionBuilder : public luisa::enable_shared_from_this<FunctionBuilder> {
 
+    friend ::luisa::MemorySanitizer;
     friend class luisa::compute::CallableLibrary;
     friend class lc::validation::Device;
     friend class FunctionDuplicator;
@@ -189,7 +193,7 @@ public:
     [[nodiscard]] static FunctionBuilder *current() noexcept;
     [[nodiscard]] static FunctionBuilder *current_or_null() noexcept;
     [[nodiscard]] static luisa::span<const FunctionBuilder *const> stack() noexcept;
-    
+
     [[nodiscard]] auto hash_computed() const noexcept { return _hash_computed; }
     // interfaces for class Function
     /// Return a span of builtin variables.

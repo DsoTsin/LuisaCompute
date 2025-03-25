@@ -11,16 +11,12 @@
 #include <utility>
 
 #include <luisa/core/stl/type_traits.h>
+#include <luisa/core/intrin.h>
 #include <luisa/vstl/config.h>
 
 #include <luisa/vstl/hash.h>
 #include <luisa/vstl/allocate_type.h>
 #include <luisa/vstl/compare.h>
-namespace luisa::detail {
-LUISA_EXPORT_API void *allocator_allocate(size_t size, size_t alignment) noexcept;
-LUISA_EXPORT_API void allocator_deallocate(void *p, size_t alignment) noexcept;
-LUISA_EXPORT_API void *allocator_reallocate(void *p, size_t size, size_t alignment) noexcept;
-}// namespace luisa::detail
 
 inline void *vengine_malloc(size_t size) {
     return luisa::detail::allocator_allocate(size, 0);
@@ -37,13 +33,17 @@ LC_VSTL_API void vengine_log(char const *chunk);
 class
 namespace vstd {
 template<typename T, typename... Args>
+    requires(luisa::is_constructible_v<T, Args && ...>)
+constexpr void construct_at(T *ptr, Args &&...args) noexcept {
+    std::construct_at(ptr, std::forward<Args>(args)...);
+}
+template<typename T, typename... Args>
     requires(!std::is_const_v<T> && luisa::is_constructible_v<T, Args && ...>)
 void reset(T &v, Args &&...args) {
-    v.~T();
-    new (std::launder(&v)) T(std::forward<Args>(args)...);
+    std::destroy_at(std::addressof(v));
+    std::construct_at(&v, std::forward<Args>(args)...);
 }
-using luisa::destruct;
-using luisa::construct;
+
 template<typename T>
 struct TypeOf {
     using Type = T;
@@ -105,7 +105,7 @@ public:
     }
     inline void destroy() noexcept {
         if constexpr (!std::is_trivially_destructible_v<T>)
-            vstd::destruct(std::launder(reinterpret_cast<T *>(storage)));
+            std::destroy_at(reinterpret_cast<T *>(storage));
     }
     T &operator*() & noexcept {
         return *std::launder(reinterpret_cast<T *>(storage));
@@ -623,13 +623,12 @@ private:
             return std::get<idx>(funcs)(std::forward<T>(v));
         }
     };
-
-    eastl::aligned_storage_t<(detail::max_size<sizeof(AA)...>()), (detail::max_size<alignof(AA)...>())> placeHolder;
+    luisa::aligned_storage_t<(detail::max_size<sizeof(AA)...>()), (detail::max_size<alignof(AA)...>())> placeHolder;
     size_t switcher = 0;
     void m_dispose() {
         if constexpr (detail::AnyMap<std::is_trivially_destructible, true>::template Run<AA...>()) {
             auto disposeFunc = [&]<typename T>(T &value) {
-                vstd::destruct(std::addressof(value));
+                std::destroy_at(std::addressof(value));
             };
             visit(disposeFunc);
         }
@@ -1100,17 +1099,17 @@ struct compare<variant<T...>> {
             return (a.index() > idx) ? 1 : -1;
     }
 };
-#define VSTD_TRIVIAL_COMPARABLE(T)               \
-    bool operator==(T const &a) const {          \
+#define VSTD_TRIVIAL_COMPARABLE(T)                    \
+    bool operator==(T const &a) const {               \
         return std::memcmp(this, &a, sizeof(T)) == 0; \
-    }                                            \
-    bool operator!=(T const &a) const {          \
+    }                                                 \
+    bool operator!=(T const &a) const {               \
         return std::memcmp(this, &a, sizeof(T)) != 0; \
-    }                                            \
-    bool operator>(T const &a) const {           \
+    }                                                 \
+    bool operator>(T const &a) const {                \
         return std::memcmp(this, &a, sizeof(T)) > 0;  \
-    }                                            \
-    bool operator<(T const &a) const {           \
+    }                                                 \
+    bool operator<(T const &a) const {                \
         return std::memcmp(this, &a, sizeof(T)) < 0;  \
     }
 class IOperatorNewBase {

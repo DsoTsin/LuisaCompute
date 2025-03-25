@@ -18,7 +18,7 @@ public:
     [[nodiscard]] Value *return_value() noexcept;
     [[nodiscard]] const Value *return_value() const noexcept;
     [[nodiscard]] const Type *return_type() const noexcept;
-    [[nodiscard]] ReturnInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] ReturnInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

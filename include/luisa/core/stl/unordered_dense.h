@@ -634,7 +634,8 @@ private:
         return const_cast<table *>(this)->do_find(key);// NOLINT(cppcoreguidelines-pro-type-const-cast)
     }
 
-    template<typename K, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<typename K, typename Q = T>
+        requires(is_map_v<Q>)
     auto do_at(K const &key) -> Q & {
         if (auto it = find(key); end() != it) {
             return it->second;
@@ -643,7 +644,8 @@ private:
         abort();
     }
 
-    template<typename K, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<typename K, typename Q = T>
+        requires(is_map_v<Q>)
     auto do_at(K const &key) const -> Q const & {
         return const_cast<table *>(this)->at(key);// NOLINT(cppcoreguidelines-pro-type-const-cast)
     }
@@ -733,8 +735,8 @@ public:
     }
 
     auto operator=(table &&other) noexcept(
-        noexcept(std::is_nothrow_move_assignable_v<value_container_type> &&std::is_nothrow_move_assignable_v<Hash> &&
-                     std::is_nothrow_move_assignable_v<KeyEqual>)) -> table & {
+        noexcept(std::is_nothrow_move_assignable_v<value_container_type> && std::is_nothrow_move_assignable_v<Hash> &&
+                 std::is_nothrow_move_assignable_v<KeyEqual>)) -> table & {
         if (&other != this) {
             deallocate_buckets();// deallocate before m_values is set (might have another allocator)
             m_values = std::move(other.m_values);
@@ -819,7 +821,8 @@ public:
         return emplace(std::move(value));
     }
 
-    template<class P, std::enable_if_t<luisa::is_constructible_v<value_type, P &&>, bool> = true>
+    template<class P>
+        requires(luisa::is_constructible_v<value_type, P &&>)
     auto insert(P &&value) -> std::pair<iterator, bool> {
         return emplace(std::forward<P>(value));
     }
@@ -832,7 +835,8 @@ public:
         return insert(std::move(value)).first;
     }
 
-    template<class P, std::enable_if_t<luisa::is_constructible_v<value_type, P &&>, bool> = true>
+    template<class P>
+        requires(luisa::is_constructible_v<value_type, P &&>)
     auto insert(const_iterator /*hint*/, P &&value) -> iterator {
         return insert(std::forward<P>(value)).first;
     }
@@ -909,12 +913,14 @@ public:
         }
     }
 
-    template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class M, typename Q = T>
+        requires(is_map_v<Q>)
     auto insert_or_assign(Key const &key, M &&mapped) -> std::pair<iterator, bool> {
         return do_insert_or_assign(key, std::forward<M>(mapped));
     }
 
-    template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class M, typename Q = T>
+        requires(is_map_v<Q>)
     auto insert_or_assign(Key &&key, M &&mapped) -> std::pair<iterator, bool> {
         return do_insert_or_assign(std::move(key), std::forward<M>(mapped));
     }
@@ -923,18 +929,20 @@ public:
              typename M,
              typename Q = T,
              typename H = Hash,
-             typename KE = KeyEqual,
-             std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+             typename KE = KeyEqual>
+        requires(is_map_v<Q> && is_transparent_v<H, KE>)
     auto insert_or_assign(K &&key, M &&mapped) -> std::pair<iterator, bool> {
         return do_insert_or_assign(std::forward<K>(key), std::forward<M>(mapped));
     }
 
-    template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class M, typename Q = T>
+        requires(is_map_v<Q>)
     auto insert_or_assign(const_iterator /*hint*/, Key const &key, M &&mapped) -> iterator {
         return do_insert_or_assign(key, std::forward<M>(mapped)).first;
     }
 
-    template<class M, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class M, typename Q = T>
+        requires(is_map_v<Q>)
     auto insert_or_assign(const_iterator /*hint*/, Key &&key, M &&mapped) -> iterator {
         return do_insert_or_assign(std::move(key), std::forward<M>(mapped)).first;
     }
@@ -943,8 +951,8 @@ public:
              typename M,
              typename Q = T,
              typename H = Hash,
-             typename KE = KeyEqual,
-             std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+             typename KE = KeyEqual>
+        requires(is_map_v<Q> && is_transparent_v<H, KE>)
     auto insert_or_assign(const_iterator /*hint*/, K &&key, M &&mapped) -> iterator {
         return do_insert_or_assign(std::forward<K>(key), std::forward<M>(mapped)).first;
     }
@@ -953,8 +961,8 @@ public:
     template<class K,
              typename Q = T,
              typename H = Hash,
-             typename KE = KeyEqual,
-             std::enable_if_t<!is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+             typename KE = KeyEqual>
+        requires(!is_map_v<Q> && is_transparent_v<H, KE>)
     auto emplace(K &&key) -> std::pair<iterator, bool> {
         if (is_full()) {
             increase_size();
@@ -1017,16 +1025,19 @@ public:
         return emplace(std::forward<Args>(args)...).first;
     }
 
-    template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class... Args, typename Q = T>
+        requires(is_map_v<Q>)
     auto try_emplace(Key const &key, Args &&...args) -> std::pair<iterator, bool> {
         return do_try_emplace(key, std::forward<Args>(args)...);
     }
 
-    template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class... Args, typename Q = T>
+        requires(is_map_v<Q>)
     auto try_emplace(Key &&key, Args &&...args) -> std::pair<iterator, bool> {
         return do_try_emplace(std::move(key), std::forward<Args>(args)...);
     }
-    template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class... Args, typename Q = T>
+        requires(is_map_v<Q>)
     auto force_emplace(Key const &key, Args &&...args) -> iterator {
         auto ret = do_try_emplace(key, std::forward<Args>(args)...);
         if constexpr (!std::is_same_v<T, void>) {
@@ -1038,7 +1049,8 @@ public:
         return ret.first;
     }
 
-    template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class... Args, typename Q = T>
+        requires(is_map_v<Q>)
     auto force_emplace(Key &&key, Args &&...args) -> iterator {
         auto ret = do_try_emplace(std::move(key), std::forward<Args>(args)...);
         if constexpr (!std::is_same_v<T, void>) {
@@ -1050,12 +1062,14 @@ public:
         return ret.first;
     }
 
-    template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class... Args, typename Q = T>
+        requires(is_map_v<Q>)
     auto try_emplace(const_iterator /*hint*/, Key const &key, Args &&...args) -> iterator {
         return do_try_emplace(key, std::forward<Args>(args)...).first;
     }
 
-    template<class... Args, typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<class... Args, typename Q = T>
+        requires(is_map_v<Q>)
     auto try_emplace(const_iterator /*hint*/, Key &&key, Args &&...args) -> iterator {
         return do_try_emplace(std::move(key), std::forward<Args>(args)...).first;
     }
@@ -1065,9 +1079,8 @@ public:
         typename... Args,
         typename Q = T,
         typename H = Hash,
-        typename KE = KeyEqual,
-        std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator>,
-                         bool> = true>
+        typename KE = KeyEqual>
+        requires(is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator>)
     auto try_emplace(K &&key, Args &&...args) -> std::pair<iterator, bool> {
         return do_try_emplace(std::forward<K>(key), std::forward<Args>(args)...);
     }
@@ -1076,9 +1089,8 @@ public:
         typename... Args,
         typename Q = T,
         typename H = Hash,
-        typename KE = KeyEqual,
-        std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator>,
-                         bool> = true>
+        typename KE = KeyEqual>
+        requires(is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator>)
     auto force_emplace(K &&key, Args &&...args) -> iterator {
         auto ret = do_try_emplace(std::forward<K>(key), std::forward<Args>(args)...);
         if constexpr (!std::is_same_v<T, void>) {
@@ -1095,9 +1107,8 @@ public:
         typename... Args,
         typename Q = T,
         typename H = Hash,
-        typename KE = KeyEqual,
-        std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator>,
-                         bool> = true>
+        typename KE = KeyEqual>
+        requires(is_map_v<Q> && is_transparent_v<H, KE> && is_neither_convertible_v<K &&, iterator, const_iterator>)
     auto try_emplace(const_iterator /*hint*/, K &&key, Args &&...args) -> iterator {
         return do_try_emplace(std::forward<K>(key), std::forward<Args>(args)...).first;
     }
@@ -1147,20 +1158,22 @@ public:
         return do_erase_key(key);
     }
 
-    template<class K, class H = Hash, class KE = KeyEqual, std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    template<class K, class H = Hash, class KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto erase(K &&key) -> size_t {
         return do_erase_key(std::forward<K>(key));
     }
 
     void swap(table &other) noexcept(noexcept(std::is_nothrow_swappable_v<value_container_type> &&
-                                                  std::is_nothrow_swappable_v<Hash> &&std::is_nothrow_swappable_v<KeyEqual>)) {
+                                              std::is_nothrow_swappable_v<Hash> && std::is_nothrow_swappable_v<KeyEqual>)) {
         using std::swap;
         swap(other, *this);
     }
 
     // lookup /////////////////////////////////////////////////////////////////
 
-    template<typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<typename Q = T>
+        requires(is_map_v<Q>)
     auto at(key_type const &key) -> Q & {
         return do_at(key);
     }
@@ -1168,13 +1181,14 @@ public:
     template<typename K,
              typename Q = T,
              typename H = Hash,
-             typename KE = KeyEqual,
-             std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+             typename KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto at(K const &key) -> Q & {
         return do_at(key);
     }
 
-    template<typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<typename Q = T>
+        requires(is_map_v<Q>)
     auto at(key_type const &key) const -> Q const & {
         return do_at(key);
     }
@@ -1182,18 +1196,20 @@ public:
     template<typename K,
              typename Q = T,
              typename H = Hash,
-             typename KE = KeyEqual,
-             std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+             typename KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto at(K const &key) const -> Q const & {
         return do_at(key);
     }
 
-    template<typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<typename Q = T>
+        requires(is_map_v<Q>)
     auto operator[](Key const &key) -> Q & {
         return try_emplace(key).first->second;
     }
 
-    template<typename Q = T, std::enable_if_t<is_map_v<Q>, bool> = true>
+    template<typename Q = T>
+        requires(is_map_v<Q>)
     auto operator[](Key &&key) -> Q & {
         return try_emplace(std::move(key)).first->second;
     }
@@ -1201,8 +1217,8 @@ public:
     template<typename K,
              typename Q = T,
              typename H = Hash,
-             typename KE = KeyEqual,
-             std::enable_if_t<is_map_v<Q> && is_transparent_v<H, KE>, bool> = true>
+             typename KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto operator[](K &&key) -> Q & {
         return try_emplace(std::forward<K>(key)).first->second;
     }
@@ -1211,7 +1227,8 @@ public:
         return find(key) == end() ? 0 : 1;
     }
 
-    template<class K, class H = Hash, class KE = KeyEqual, std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    template<class K, class H = Hash, class KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto count(K const &key) const -> size_t {
         return find(key) == end() ? 0 : 1;
     }
@@ -1224,12 +1241,14 @@ public:
         return do_find(key);
     }
 
-    template<class K, class H = Hash, class KE = KeyEqual, std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    template<class K, class H = Hash, class KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto find(K const &key) -> iterator {
         return do_find(key);
     }
 
-    template<class K, class H = Hash, class KE = KeyEqual, std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    template<class K, class H = Hash, class KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto find(K const &key) const -> const_iterator {
         return do_find(key);
     }
@@ -1238,7 +1257,8 @@ public:
         return find(key) != end();
     }
 
-    template<class K, class H = Hash, class KE = KeyEqual, std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    template<class K, class H = Hash, class KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto contains(K const &key) const -> bool {
         return find(key) != end();
     }
@@ -1253,13 +1273,15 @@ public:
         return {it, it == end() ? end() : it + 1};
     }
 
-    template<class K, class H = Hash, class KE = KeyEqual, std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    template<class K, class H = Hash, class KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto equal_range(K const &key) -> std::pair<iterator, iterator> {
         auto it = do_find(key);
         return {it, it == end() ? end() : it + 1};
     }
 
-    template<class K, class H = Hash, class KE = KeyEqual, std::enable_if_t<is_transparent_v<H, KE>, bool> = true>
+    template<class K, class H = Hash, class KE = KeyEqual>
+        requires(is_transparent_v<H, KE>)
     auto equal_range(K const &key) const -> std::pair<const_iterator, const_iterator> {
         auto it = do_find(key);
         return {it, it == end() ? end() : it + 1};
@@ -1419,4 +1441,3 @@ auto erase_if(ankerl::unordered_dense::detail::table<Key, T, Hash, KeyEqual, All
 
 #endif
 #endif
-

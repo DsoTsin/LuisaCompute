@@ -50,9 +50,9 @@ if (LLVM_FOUND AND embree_FOUND)
     target_compile_definitions(luisa-compute-backend-fallback PRIVATE
             LUISA_COMPUTE_FALLBACK_EMBREE_VERSION=${embree_VERSION_MAJOR})
 
-    option(LUISA_COMPUTE_ENABLE_SYSTEM_PARALLEL_FOR "Enable system parallel_for" OFF)
-    if (LUISA_COMPUTE_ENABLE_SYSTEM_PARALLEL_FOR)
-        target_compile_definitions(luisa-compute-backend-fallback PRIVATE LUISA_COMPUTE_ENABLE_SYSTEM_PARALLEL_FOR=1)
+    option(LUISA_COMPUTE_USE_SYSTEM_PARALLEL_FOR "Enable system parallel_for" OFF)
+    if (LUISA_COMPUTE_USE_SYSTEM_PARALLEL_FOR)
+        target_compile_definitions(luisa-compute-backend-fallback PRIVATE LUISA_COMPUTE_USE_SYSTEM_PARALLEL_FOR=1)
         # use libdispatch or TBB for parallel_for on non-Apple Unix systems if available
         if (UNIX AND NOT APPLE)
             # libdispatch

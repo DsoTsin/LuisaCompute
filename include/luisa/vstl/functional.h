@@ -21,7 +21,7 @@ public:
     FuncRef() noexcept : _user_data{nullptr}, _func_ptr{nullptr} {}
     template<typename Lambda>
         requires(std::is_invocable_r_v<Ret, Lambda, Args...>)
-    FuncRef(Lambda &&lambda) noexcept {
+    FuncRef(Lambda &lambda) noexcept {
         _user_data = &lambda;
         _func_ptr = [](void *ptr, Args &&...args) noexcept -> Ret {
             return (*reinterpret_cast<std::remove_cvref_t<Lambda> *>(ptr))(std::forward<Args>(args)...);
@@ -52,5 +52,32 @@ public:
         return _func_ptr(_user_data, std::forward<Args>(args)...);
     }
 };
+
+namespace detail {
+template<typename Ret, typename... Args>
+struct ObjType {
+    template<template<typename...> typename Object>
+    using Type = Object<Ret(Args...)>;
+};
+template<typename T>
+struct member_func_meta;
+
+template<typename Ret, typename Class, typename... Args>
+struct member_func_meta<Ret (Class::*)(Args...) const> : ObjType<Ret, Args...> {
+};
+template<typename Ret, typename Class, typename... Args>
+struct member_func_meta<Ret (Class::*)(Args...)> : ObjType<Ret, Args...> {
+};
+template<typename Ret, typename Class, typename... Args>
+struct member_func_meta<Ret (Class::*)(Args...) const noexcept> : ObjType<Ret, Args...> {
+};
+template<typename Ret, typename Class, typename... Args>
+struct member_func_meta<Ret (Class::*)(Args...) noexcept> : ObjType<Ret, Args...> {
+};
+}// namespace detail
+template<typename Lambda>
+inline auto make_func_ref(Lambda &lambda) noexcept {
+    return typename detail::member_func_meta<decltype(&std::remove_reference_t<Lambda>::operator())>::template Type<vstd::FuncRef>{lambda};
+}
 
 }// namespace vstd

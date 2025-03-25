@@ -14,7 +14,7 @@ namespace detail {
 
 [[nodiscard]] static bool is_alloca_promotable(AllocaInst *inst) noexcept {
     // check if it's a local variable
-    if (inst->space() != AllocSpace::LOCAL) { return false; }
+    if (inst->op() != AllocaOp::LOCAL) { return false; }
     // check if it's used as reference in other instructions than load/store
     for (auto &&use : inst->use_list()) {
         if (auto user = use.user()) {
@@ -109,7 +109,7 @@ struct PhiInsertionAndRenaming {
     template<typename T>
     [[nodiscard]] Value *find_dom_value_for_use_block(BasicBlock *use_block, const Type *type,
                                                       const luisa::unordered_map<BasicBlock *, T *> &defs_in_use_block,
-                                                      const AllocaAnalysis &analysis) noexcept {
+                                                      const AllocaAnalysis &analysis, bool consider_stores) noexcept {
         // the load has a phi node in the same block
         if (auto iter = defs_in_use_block.find(use_block); iter != defs_in_use_block.end()) {
             return iter->second;
@@ -119,6 +119,13 @@ struct PhiInsertionAndRenaming {
             while (node != analysis.dom.root()) {
                 auto parent = node->parent();
                 LUISA_DEBUG_ASSERT(parent != nullptr, "Invalid parent.");
+                // store must have higher priority than phi nodes as it's closer to the use block
+                if (consider_stores) {
+                    if (auto iter = analysis.def_blocks.find(parent->block()); iter != analysis.def_blocks.end()) {
+                        return iter->second->value();
+                    }
+                }
+                // check phi nodes if no store is found
                 if (auto iter = out_values.find(parent->block()); iter != out_values.end()) {
                     return iter->second;
                 }
@@ -144,13 +151,13 @@ struct PhiInsertionAndRenaming {
                 if (auto fb = frontier->block(); analysis.live_in_blocks.contains(fb)) {
                     if (auto iter = block_to_phi.try_emplace(fb, nullptr).first; iter->second == nullptr) {
                         // insert the phi node
-                        Builder b;
+                        XIRBuilder b;
                         b.set_insertion_point(fb->instructions().head_sentinel());
                         auto phi = b.phi(type);
                         iter->second = phi;
                         inserted.emplace_back(phi);
                         info.inserted_phi_instructions.emplace(phi);
-                        // update the block-out value (note: we will overwrite it later if the block contains a store)
+                        // update the block-out phi value
                         out_values[fb] = phi;
                         // replace the load instructions in the same block with the new phi node
                         if (auto use_iter = analysis.use_blocks.find(fb); use_iter != analysis.use_blocks.end()) {
@@ -162,16 +169,16 @@ struct PhiInsertionAndRenaming {
                 }
             }
         }
-        // overwrite the block-out values with the store values
-        for (auto [def_block, store] : analysis.def_blocks) {
-            out_values[def_block] = store->value();
-        }
         // each of the use blocks must be dominated by some def/phi block, or it must contain undefined value
         for (auto [use_block, load_inst] : analysis.use_blocks) {
             if (!info.removed_load_instructions.contains(load_inst)) {
-                auto dom_value = find_dom_value_for_use_block(use_block, type, block_to_phi, analysis);
+                auto dom_value = find_dom_value_for_use_block(use_block, type, block_to_phi, analysis, true);
                 replace_load_with_value(load_inst, dom_value, info);
             }
+        }
+        // overwrite the block-out values with the store values
+        for (auto [def_block, store_inst] : analysis.def_blocks) {
+            out_values[def_block] = store_inst->value();
         }
         // fill incomings of the phi nodes
         for (auto mapping : block_to_phi) {
@@ -179,7 +186,7 @@ struct PhiInsertionAndRenaming {
             auto phi_block = mapping.first;
             auto phi_inst = mapping.second;
             phi_block->traverse_predecessors(false, [&](BasicBlock *pred) noexcept {
-                auto dom_value = find_dom_value_for_use_block(pred, type, out_values, analysis);
+                auto dom_value = find_dom_value_for_use_block(pred, type, out_values, analysis, false);
                 phi_inst->add_incoming(dom_value, pred);
             });
         }

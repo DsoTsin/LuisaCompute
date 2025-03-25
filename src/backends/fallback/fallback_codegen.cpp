@@ -1423,7 +1423,7 @@ private:
         auto llvm_src = _lookup_value(current, b, src);
 
         auto indices = inst->operand_uses().subspan(1);
-        auto statically_shuffled = std::all_of(indices.cbegin(), indices.cend(), [](const xir::Use *v) {
+        auto statically_shuffled = std::all_of(indices.begin(), indices.end(), [](const xir::Use *v) {
             LUISA_ASSERT(v->value() != nullptr, "shuffle index is null");
             return v->value()->derived_value_tag() == xir::DerivedValueTag::CONSTANT;
         });

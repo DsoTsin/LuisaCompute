@@ -68,7 +68,7 @@ void RasterShader::GetMeshFormatState(
         "TEXCOORD"};
     static auto SemanticIndex = {0u, 0u, 0u, 0u, 0u, 1u, 2u, 3u};
     vstd::fixed_vector<uint, 4> offsets(meshFormat.vertex_stream_count());
-    std::memset(offsets.data(), 0, offsets.size_bytes());
+    std::memset(offsets.data(), 0, luisa::size_bytes(offsets));
     for (auto i : vstd::range(meshFormat.vertex_stream_count())) {
         auto vec = meshFormat.attributes(i);
         for (auto &&attr : vec) {
@@ -262,7 +262,7 @@ vstd::MD5 RasterShader::GenMD5(
     };
     Hashes h{
         .codeMd5 = codeMD5,
-        .meshFormatMD5 = vstd_xxhash_gethash(streamHashes.data(), streamHashes.size_bytes())};
+        .meshFormatMD5 = vstd_xxhash_gethash(streamHashes.data(), luisa::size_bytes(streamHashes))};
     return vstd::MD5(
         vstd::span<uint8_t const>{
             reinterpret_cast<uint8_t const *>(&h),
@@ -306,7 +306,7 @@ RasterShader *RasterShader::CompileRaster(
         auto kernelArgs = RasterShaderDetail::GetKernelArgs(vertexKernel, pixelKernel);
         auto GetVector = [&](ComPtr<IDxcBlob> &blob) {
             vstd::vector<std::byte> vec;
-            vec.push_back_uninitialized(blob->GetBufferSize());
+            luisa::enlarge_by(vec, blob->GetBufferSize());
             std::memcpy(vec.data(), blob->GetBufferPointer(), blob->GetBufferSize());
             return vec;
         };
@@ -318,7 +318,7 @@ RasterShader *RasterShader::CompileRaster(
                 str.properties,
                 kernelArgs, vertBin, pixelBin, md5, str.typeMD5, bdlsBufferCount,
                 str.printers);
-            WriteBinaryIO(cacheType, fileIo, fileName, {reinterpret_cast<std::byte const *>(serData.data()), serData.size_bytes()});
+            WriteBinaryIO(cacheType, fileIo, fileName, {reinterpret_cast<std::byte const *>(serData.data()), luisa::size_bytes(serData)});
         }
 
         auto s = new RasterShader(
@@ -394,7 +394,7 @@ void RasterShader::SaveRaster(
         kernelArgs,
         vertBin, pixelBin, md5, str.typeMD5, bdlsBufferCount,
         str.printers);
-    static_cast<void>(fileIo->write_shader_bytecode(fileName, {reinterpret_cast<std::byte const *>(serData.data()), serData.size_bytes()}));
+    static_cast<void>(fileIo->write_shader_bytecode(fileName, {reinterpret_cast<std::byte const *>(serData.data()), luisa::size_bytes(serData)}));
 }
 RasterShader *RasterShader::LoadRaster(
     BinaryIO const *fileIo,
@@ -411,7 +411,7 @@ ID3D12PipelineState *RasterShader::GetPSO(
     RasterState const &rasterState) {
     std::pair<PSOMap::Index, bool> idx;
     RasterPSOState psoState;
-    psoState.rtvFormats.push_back_uninitialized(rtvFormats.size());
+    luisa::enlarge_by(psoState.rtvFormats, rtvFormats.size());
     if (!rtvFormats.empty()) {
         std::memcpy(psoState.rtvFormats.data(), rtvFormats.data(), rtvFormats.size_bytes());
     }
@@ -429,13 +429,13 @@ ID3D12PipelineState *RasterShader::GetPSO(
     vstd::vector<std::byte> md5Bytes;
     auto push = [&]<typename T>(T const &t) {
         auto sz = md5Bytes.size();
-        md5Bytes.push_back_uninitialized(sizeof(T));
+        luisa::enlarge_by(md5Bytes, sizeof(T));
         std::memcpy(md5Bytes.data() + sz, &t, sizeof(T));
     };
     auto pushArray = [&]<typename T>(T const *ptr, size_t size) {
         auto sz = md5Bytes.size();
         auto byteSize = size * sizeof(T);
-        md5Bytes.push_back_uninitialized(byteSize);
+        luisa::enlarge_by(md5Bytes, byteSize);
         std::memcpy(md5Bytes.data() + sz, ptr, byteSize);
     };
     pushArray(psoState.rtvFormats.data(), psoState.rtvFormats.size());
@@ -460,7 +460,7 @@ ID3D12PipelineState *RasterShader::GetPSO(
     bool newPso = false;
     if (psoStream != nullptr && psoStream->length() > 0) {
         vstd::vector<std::byte> psoCode;
-        psoCode.push_back_uninitialized(psoStream->length());
+        luisa::enlarge_by(psoCode, psoStream->length());
         psoStream->read({psoCode.data(), psoCode.size()});
         psoDesc.CachedPSO = {
             .pCachedBlob = psoCode.data(),

@@ -3,9 +3,10 @@
 #include <luisa/core/stl/string.h>
 
 namespace luisa {
-
+class MemorySanitizer;
 class LC_CORE_API FirstFit {
-
+    friend class MemorySanitizer;
+    static void dispose_first_fit_node_pool();
 public:
     class Node {
 

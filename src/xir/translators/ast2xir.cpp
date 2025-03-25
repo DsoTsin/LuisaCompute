@@ -72,7 +72,7 @@ private:
     Current _current;
 
 private:
-    [[nodiscard]] Value *_translate_unary_expr(Builder &b, const UnaryExpr *expr) noexcept {
+    [[nodiscard]] Value *_translate_unary_expr(XIRBuilder &b, const UnaryExpr *expr) noexcept {
         auto operand = _translate_expression(b, expr->operand(), true);
         // matrices need special handling
         if (operand->type()->is_matrix()) {
@@ -101,7 +101,7 @@ private:
         return b.call(expr->type(), op, {operand});
     }
 
-    [[nodiscard]] Value *_type_cast_if_necessary(Builder &b, const Type *type, Value *value) noexcept {
+    [[nodiscard]] Value *_type_cast_if_necessary(XIRBuilder &b, const Type *type, Value *value) noexcept {
         // no cast needed
         if (type == value->type()) { return value; }
         // scalar to scalar cast
@@ -130,7 +130,7 @@ private:
         LUISA_ERROR_WITH_LOCATION("Invalid cast operation.");
     }
 
-    [[nodiscard]] Value *_translate_binary_expr(Builder &b, const BinaryExpr *expr) noexcept {
+    [[nodiscard]] Value *_translate_binary_expr(XIRBuilder &b, const BinaryExpr *expr) noexcept {
         auto type_promotion = promote_types(expr->op(), expr->lhs()->type(), expr->rhs()->type());
         auto op = [binary_op = expr->op(), lhs = expr->lhs(), rhs = expr->rhs()] {
             auto has_matrix = lhs->type()->is_matrix() || rhs->type()->is_matrix();
@@ -183,7 +183,7 @@ private:
         return _translate_typed_literal(key);
     }
 
-    [[nodiscard]] Value *_collect_access_indices(Builder &b, const Expression *expr, luisa::fixed_vector<Value *, 16u> &rev_indices) noexcept {
+    [[nodiscard]] Value *_collect_access_indices(XIRBuilder &b, const Expression *expr, luisa::fixed_vector<Value *, 16u> &rev_indices) noexcept {
         switch (expr->tag()) {
             case Expression::Tag::MEMBER: {
                 auto member_expr = static_cast<const MemberExpr *>(expr);
@@ -202,7 +202,7 @@ private:
         return _translate_expression(b, expr, false);
     }
 
-    [[nodiscard]] Value *_translate_member_or_access_expr(Builder &b, const Expression *expr, bool load_lval) noexcept {
+    [[nodiscard]] Value *_translate_member_or_access_expr(XIRBuilder &b, const Expression *expr, bool load_lval) noexcept {
         luisa::fixed_vector<Value *, 16u> args;
         auto base = _collect_access_indices(b, expr, args);
         if (base->is_lvalue()) {
@@ -216,7 +216,7 @@ private:
         return b.call(expr->type(), ArithmeticOp::EXTRACT, args);
     }
 
-    [[nodiscard]] Value *_translate_member_expr(Builder &b, const MemberExpr *expr, bool load_lval) noexcept {
+    [[nodiscard]] Value *_translate_member_expr(XIRBuilder &b, const MemberExpr *expr, bool load_lval) noexcept {
         if (expr->is_swizzle()) {
             if (expr->swizzle_size() == 1u) {
                 auto v = _translate_expression(b, expr->self(), load_lval);
@@ -279,7 +279,7 @@ private:
         return r;
     }
 
-    [[nodiscard]] Value *_translate_ref_expr(Builder &b, const RefExpr *expr, bool load_lval) noexcept {
+    [[nodiscard]] Value *_translate_ref_expr(XIRBuilder &b, const RefExpr *expr, bool load_lval) noexcept {
         auto ast_var = expr->variable();
         LUISA_ASSERT(ast_var.type() == expr->type(), "Variable type mismatch.");
         if (auto iter = _current.variables.find(ast_var); iter != _current.variables.end()) {
@@ -370,7 +370,7 @@ private:
         LUISA_ERROR_WITH_LOCATION("Unexpected zero or one constant.");
     }
 
-    [[nodiscard]] Value *_translate_call_expr(Builder &b, const CallExpr *expr) noexcept {
+    [[nodiscard]] Value *_translate_call_expr(XIRBuilder &b, const CallExpr *expr) noexcept {
         if (expr->is_external()) {
             auto ast = expr->external();
             auto f = add_external_function(*ast);
@@ -782,7 +782,7 @@ private:
         LUISA_NOT_IMPLEMENTED();
     }
 
-    [[nodiscard]] Value *_translate_cast_expr(Builder &b, const CastExpr *expr) noexcept {
+    [[nodiscard]] Value *_translate_cast_expr(XIRBuilder &b, const CastExpr *expr) noexcept {
         auto value = _translate_expression(b, expr->expression(), true);
         switch (expr->op()) {
             case compute::CastOp::STATIC: return _type_cast_if_necessary(b, expr->type(), value);
@@ -791,7 +791,7 @@ private:
         LUISA_ERROR_WITH_LOCATION("Unexpected cast operation.");
     }
 
-    [[nodiscard]] Value *_translate_expression(Builder &b, const Expression *expr, bool load_lval) noexcept {
+    [[nodiscard]] Value *_translate_expression(XIRBuilder &b, const Expression *expr, bool load_lval) noexcept {
         LUISA_ASSERT(expr != nullptr, "Expression must not be null.");
         switch (expr->tag()) {
             case Expression::Tag::UNARY: return _translate_unary_expr(b, static_cast<const UnaryExpr *>(expr));
@@ -826,7 +826,7 @@ private:
         _current.comments.emplace_back(static_cast<const CommentStmt *>(stmt));
     }
 
-    void _translate_switch_stmt(Builder &b, const SwitchStmt *ast_switch, luisa::span<const Statement *const> cdr) noexcept {
+    void _translate_switch_stmt(XIRBuilder &b, const SwitchStmt *ast_switch, luisa::span<const Statement *const> cdr) noexcept {
         // we do not support break/continue in switch statement
         auto old_break_continue_target = std::exchange(_current.break_continue_target, {});
         auto value = _translate_expression(b, ast_switch->expression(), true);
@@ -890,7 +890,7 @@ private:
         _translate_statements(b, cdr);
     }
 
-    void _translate_if_stmt(Builder &b, const IfStmt *ast_if, luisa::span<const Statement *const> cdr) noexcept {
+    void _translate_if_stmt(XIRBuilder &b, const IfStmt *ast_if, luisa::span<const Statement *const> cdr) noexcept {
         auto cond = _translate_expression(b, ast_if->condition(), true);
         cond = b.static_cast_if_necessary(Type::of<bool>(), cond);
         auto inst = _commented(b.if_(cond));
@@ -912,7 +912,7 @@ private:
         _translate_statements(b, cdr);
     }
 
-    void _translate_loop_stmt(Builder &b, const LoopStmt *ast_loop, luisa::span<const Statement *const> cdr) noexcept {
+    void _translate_loop_stmt(XIRBuilder &b, const LoopStmt *ast_loop, luisa::span<const Statement *const> cdr) noexcept {
         auto inst = _commented(b.simple_loop());
         auto merge_block = inst->create_merge_block();
         auto body_block = inst->create_body_block();
@@ -932,7 +932,7 @@ private:
         _translate_statements(b, cdr);
     }
 
-    void _translate_for_stmt(Builder &b, const ForStmt *ast_for, luisa::span<const Statement *const> cdr) noexcept {
+    void _translate_for_stmt(XIRBuilder &b, const ForStmt *ast_for, luisa::span<const Statement *const> cdr) noexcept {
         auto var = _translate_expression(b, ast_for->variable(), false);
         auto inst = _commented(b.loop());
         auto merge_block = inst->create_merge_block();
@@ -975,7 +975,7 @@ private:
         _translate_statements(b, cdr);
     }
 
-    void _translate_ray_query_stmt(Builder &b, const RayQueryStmt *ast_ray_query, luisa::span<const Statement *const> cdr) noexcept {
+    void _translate_ray_query_stmt(XIRBuilder &b, const RayQueryStmt *ast_ray_query, luisa::span<const Statement *const> cdr) noexcept {
         // we do not support break/continue in ray query statement
         auto old_break_continue_target = std::exchange(_current.break_continue_target, {});
         // create the ray query loop
@@ -1005,7 +1005,7 @@ private:
         _translate_statements(b, cdr);
     }
 
-    void _translate_statements(Builder &b, luisa::span<const Statement *const> stmts) noexcept {
+    void _translate_statements(XIRBuilder &b, luisa::span<const Statement *const> stmts) noexcept {
         while (!stmts.empty()) {
             auto car = stmts.front();
             auto cdr = stmts.subspan(1);
@@ -1090,7 +1090,7 @@ private:
 
     void _translate_current_function() noexcept {
         // create the body block
-        Builder b;
+        XIRBuilder b;
         b.set_insertion_point(_current.f->create_body_block());
         // convert the arguments
         for (auto ast_arg : _current.ast->arguments()) {

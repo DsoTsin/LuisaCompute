@@ -21,7 +21,7 @@ struct RasterPSOStateHash {
         if (v.rtvFormats.empty()) {
             hash = luisa::hash64_default_seed;
         } else {
-            hash = luisa::hash64(v.rtvFormats.data(), v.rtvFormats.size_bytes(), luisa::hash64_default_seed);
+            hash = luisa::hash64(v.rtvFormats.data(), luisa::size_bytes(v.rtvFormats), luisa::hash64_default_seed);
         }
         hash = luisa::hash64(&v.dsvFormat, sizeof(v.dsvFormat), hash);
         hash = luisa::hash64(&v.rasterState, sizeof(v.rasterState), hash);
@@ -33,7 +33,7 @@ struct RasterPSOStateEqual {
         auto rtvSizeComp = vstd::compare<size_t>{}(a.rtvFormats.size(), b.rtvFormats.size());
         if (rtvSizeComp != 0) return rtvSizeComp;
         if (!a.rtvFormats.empty()) {
-            auto level = std::memcmp(a.rtvFormats.data(), b.rtvFormats.data(), a.rtvFormats.size_bytes());
+            auto level = std::memcmp(a.rtvFormats.data(), b.rtvFormats.data(), luisa::size_bytes(a.rtvFormats));
             if (level != 0) return level;
         }
         auto dsvComp = vstd::compare<DepthFormat>{}(a.dsvFormat, b.dsvFormat);

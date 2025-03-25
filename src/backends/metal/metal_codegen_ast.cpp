@@ -424,7 +424,7 @@ void MetalCodegenAST::_emit_function() noexcept {
         }
     } else {
         auto texture_count = std::count_if(
-            _function.arguments().cbegin(), _function.arguments().cend(),
+            _function.arguments().begin(), _function.arguments().end(),
             [](auto arg) { return arg.type()->is_texture(); });
         if (texture_count > 0) {
             _scratch << "template<";

@@ -37,7 +37,7 @@ static void eliminate_early_return_in_function(Function *function, EarlyReturnEl
             }
         });
         if (auto early_returns = luisa::span{info.eliminated_instructions}.subspan(prev_size); !early_returns.empty()) {
-            Builder b;
+            XIRBuilder b;
             // create a flag to indicate whether the function has *NOT* returned
             b.set_insertion_point(def->body_block()->instructions().head_sentinel());
             auto bool_type = Type::of<bool>();

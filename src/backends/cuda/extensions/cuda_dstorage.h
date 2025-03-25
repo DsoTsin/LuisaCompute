@@ -152,7 +152,7 @@ private:
     size_t _size_bytes;
 
 public:
-    explicit CUDAMappedFile(luisa::string_view path) noexcept;
+    CUDAMappedFile(CUdevice device, luisa::string_view path) noexcept;
     ~CUDAMappedFile() noexcept;
     CUDAMappedFile(CUDAMappedFile &&) noexcept = delete;
     CUDAMappedFile(const CUDAMappedFile &) noexcept = delete;
@@ -171,7 +171,7 @@ private:
     size_t _size_bytes;
 
 public:
-    CUDAPinnedMemory(void *p, size_t size) noexcept;
+    CUDAPinnedMemory(CUdevice device, void *p, size_t size) noexcept;
     ~CUDAPinnedMemory() noexcept;
     CUDAPinnedMemory(CUDAPinnedMemory &&) noexcept = delete;
     CUDAPinnedMemory(const CUDAPinnedMemory &) noexcept = delete;

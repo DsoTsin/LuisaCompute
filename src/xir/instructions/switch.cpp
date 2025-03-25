@@ -120,7 +120,7 @@ const BasicBlock *SwitchInst::default_block() const noexcept {
     return const_cast<SwitchInst *>(this)->default_block();
 }
 
-SwitchInst *SwitchInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+SwitchInst *SwitchInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_value = resolver.resolve(value());
     auto cloned = b.switch_(resolved_value);
     auto resolved_default = resolver.resolve(default_block());

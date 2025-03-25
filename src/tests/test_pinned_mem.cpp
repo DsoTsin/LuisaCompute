@@ -34,12 +34,12 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < buffer_size; ++i) {
         data.emplace_back(i);
     }
-    memcpy(upload_buffer.native_handle(), data.data(), data.size_bytes());
+    memcpy(upload_buffer.native_handle(), data.data(), luisa::size_bytes(data));
     stream
         << shader().dispatch(buffer_size)
         << readback_buffer.copy_from(default_buffer)
         << synchronize();
-    memcpy(data.data(), readback_buffer.native_handle(), data.size_bytes());
+    memcpy(data.data(), readback_buffer.native_handle(), luisa::size_bytes(data));
     luisa::string result;
     for(auto & i : data){
         result += std::to_string(i);

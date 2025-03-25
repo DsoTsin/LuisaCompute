@@ -218,10 +218,10 @@ private:
                 } else if (e->is_external()) {
                     auto &o = _contexts.back()->original;
                     auto iter = std::find_if(
-                        o.external_callables().cbegin(),
-                        o.external_callables().cend(),
+                        o.external_callables().begin(),
+                        o.external_callables().end(),
                         [ext = e->external()](auto &&f) noexcept { return *f == *ext; });
-                    LUISA_ASSERT(iter != o.external_callables().cend(),
+                    LUISA_ASSERT(iter != o.external_callables().end(),
                                  "External function not found in context.");
                     copy = fb->call(e->type(), *iter, args);
                 } else {

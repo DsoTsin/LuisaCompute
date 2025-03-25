@@ -74,39 +74,34 @@ public:
             std::find(
                 installed_backends.cbegin(),
                 installed_backends.cend(),
-                backend_name
-            ) == installed_backends.cend()
-        ) {
+                backend_name) == installed_backends.cend()) {
             LUISA_ERROR_WITH_LOCATION("Backend '{}' is not installed.", backend_name);
         }
 
-        std::scoped_lock lock { module_mutex };
+        std::scoped_lock lock{module_mutex};
         if (
             auto iter = loaded_backends.find(backend_name);
-            iter != loaded_backends.cend()
-        ) {
+            iter != loaded_backends.cend()) {
             return *iter->second;
         }
-        BackendModule m {
+        BackendModule m{
             .module = DynamicModule::load(
                 runtime_directory,
-                luisa::format("lc-backend-{}", backend_name)
-            )
-        };
+                luisa::format("lc-backend-{}", backend_name))};
         LUISA_ASSERT(m.module, "Failed to load backend '{}'.", backend_name);
         m.creator = m.module.function<Device::Creator>("create");
         m.deleter = m.module.function<Device::Deleter>("destroy");
         m.backend_device_names = m.module.function<BackendModule::BackendDeviceNames>("backend_device_names");
         auto pm = loaded_backends.emplace(
-            backend_name,
-            luisa::make_unique<BackendModule>(std::move(m))
-        ).first->second.get();
+                                     backend_name,
+                                     luisa::make_unique<BackendModule>(std::move(m)))
+                      .first->second.get();
 
         return *pm;
     }
 
     [[nodiscard]] const ValidationLayer &load_validation_layer() noexcept {
-        std::scoped_lock lock { module_mutex };
+        std::scoped_lock lock{module_mutex};
         if (!validation_layer.module) {
             validation_layer.module = DynamicModule::load(runtime_directory, "lc-validation-layer");
             validation_layer.creator = validation_layer.module.function<ValidationLayer::Creator>("create");
@@ -118,12 +113,11 @@ public:
 
     explicit ContextImpl(luisa::string_view program_path) noexcept {
         using namespace std::string_view_literals;
-        
-        luisa::filesystem::path program { program_path };
+
+        luisa::filesystem::path program{program_path};
         LUISA_INFO(
             "Created context for program '{}'.",
-            luisa::to_string(program.filename())
-        );
+            luisa::to_string(program.filename()));
 
         {
             auto cp = luisa::filesystem::canonical(program);
@@ -134,17 +128,16 @@ public:
             }
             LUISA_INFO(
                 "Runtime directory: {}.",
-                luisa::to_string(runtime_directory)
-            );
+                luisa::to_string(runtime_directory));
             DynamicModule::add_search_path(runtime_directory);
         }
 
         const auto extension_so = luisa::filesystem::path(".so");
         const auto extension_dll = luisa::filesystem::path(".dll");
         const auto extension_dylib = luisa::filesystem::path(".dylib");
-        constexpr std::array possible_prefixes {
+        constexpr std::array possible_prefixes{
             "lc-backend-"sv,
-            "liblc-backend-"sv // Make Mingw happy
+            "liblc-backend-"sv// Make Mingw happy
         };
         for (auto &&p : luisa::filesystem::directory_iterator{runtime_directory}) {
             auto &&path = p.path();
@@ -152,12 +145,9 @@ public:
             const auto path_extension = path.extension();
 
             if (
-                p_is_regular_file && (
-                    path_extension == extension_so ||
-                    path_extension == extension_dll ||
-                    path_extension == extension_dylib
-                )
-            ) {
+                p_is_regular_file && (path_extension == extension_so ||
+                                      path_extension == extension_dll ||
+                                      path_extension == extension_dylib)) {
                 auto filename = luisa::to_string(path.stem());
                 for (auto prefix : possible_prefixes) {
                     if (filename.starts_with(prefix)) {
@@ -174,15 +164,12 @@ public:
         }
         luisa::sort(
             installed_backends.begin(),
-            installed_backends.end()
-        );
+            installed_backends.end());
         installed_backends.erase(
             std::unique(
                 installed_backends.begin(),
-                installed_backends.end()
-            ),
-            installed_backends.end()
-        );
+                installed_backends.end()),
+            installed_backends.end());
     }
 
     ~ContextImpl() noexcept {
@@ -190,39 +177,34 @@ public:
     }
 };
 
-} // namespace detail end
-
+}// namespace detail
 
 Context::Context(string_view program_path) noexcept
-    : _impl{luisa::make_shared<detail::ContextImpl>(program_path)}
-{}
+    : _impl{luisa::make_shared<detail::ContextImpl>(program_path)} {}
 
 Device Context::create_device(
     luisa::string_view backend_name_in,
     const DeviceConfig *settings,
-    bool enable_validation
-) noexcept {
-    luisa::string backend_name { backend_name_in };
+    bool enable_validation) noexcept {
+    luisa::string backend_name{backend_name_in};
     auto &&m = _impl->load_backend(backend_name);
     auto interface = m.creator(Context{_impl}, settings);
     interface->_backend_name = std::move(backend_name);
-    auto handle = Device::Handle {
+    auto handle = Device::Handle{
         interface,
         [impl = _impl, deleter = m.deleter](auto p) noexcept {
             deleter(p);
-        }
-    };
+        }};
     if (enable_validation) {
         auto &validation_layer = _impl->load_validation_layer();
-        auto layer_handle = Device::Handle {
+        auto layer_handle = Device::Handle{
             validation_layer.creator(Context{_impl}, std::move(handle)),
             [impl = _impl](auto layer) noexcept {
                 impl->validation_layer.deleter(layer);
-            }
-        };
-        return Device { std::move(layer_handle) };
+            }};
+        return Device{std::move(layer_handle)};
     } else {
-        return Device { std::move(handle) };
+        return Device{std::move(handle)};
     }
 }
 
@@ -256,7 +238,11 @@ const luisa::filesystem::path &Context::runtime_directory() const noexcept {
 const luisa::filesystem::path &Context::create_runtime_subdir(luisa::string_view folder_name) const noexcept {
     std::lock_guard lock{_impl->runtime_subdir_mutex};
     auto iter = _impl->runtime_subdir_paths.try_emplace(
+#ifdef LUISA_USE_SYSTEM_STL
+        luisa::string{folder_name},
+#else
         folder_name,
+#endif
         luisa::lazy_construct([&]() {
             auto dir = runtime_directory() / folder_name;
             std::error_code ec;

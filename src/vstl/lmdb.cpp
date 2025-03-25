@@ -63,10 +63,10 @@ void LMDB::write_all(luisa::vector<LMDBWriteCommand> &&commands) const noexcept 
     LUISA_CHECK_LMDB_ERROR(mdb_txn_begin(_env, nullptr, 0, &txn));
     for (auto &i : commands) {
         MDB_val key_v{
-            .mv_size = i.key.size_bytes(),
+            .mv_size = luisa::size_bytes(i.key),
             .mv_data = const_cast<std::byte *>(i.key.data())};
         MDB_val value_v{
-            .mv_size = i.value.size_bytes(),
+            .mv_size = luisa::size_bytes(i.value),
             .mv_data = const_cast<std::byte *>(i.value.data())};
         mdb_put(txn, *_dbi, &key_v, &value_v, 0);
     }
@@ -113,7 +113,7 @@ void LMDB::remove_all(luisa::vector<luisa::vector<std::byte>> &&keys) const noex
     LUISA_CHECK_LMDB_ERROR(mdb_txn_begin(_env, nullptr, 0, &txn));
     for (auto &i : keys) {
         MDB_val key_v{
-            .mv_size = i.size_bytes(),
+            .mv_size = luisa::size_bytes(i),
             .mv_data = const_cast<std::byte *>(i.data())};
         mdb_del(txn, *_dbi, &key_v, nullptr);
     }

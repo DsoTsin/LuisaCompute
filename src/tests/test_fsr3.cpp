@@ -154,8 +154,8 @@ public:
     }
     FSR3SwapChain &operator=(FSR3SwapChain const &) = delete;
     FSR3SwapChain &operator=(FSR3SwapChain &&rhs) {
-        this->~FSR3SwapChain();
-        new (std::launder(this)) FSR3SwapChain(std::move(rhs));
+        std::destroy_at(this);
+        std::construct_at(this, std::move(rhs));
         return *this;
     }
     void dispose() {

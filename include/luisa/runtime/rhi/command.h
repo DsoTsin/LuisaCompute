@@ -27,23 +27,25 @@ struct IndirectDispatchArg {
     uint32_t max_dispatch_size;
 };
 
+// clang-format off
 #define LUISA_COMPUTE_RUNTIME_COMMANDS   \
-    BufferUploadCommand,                 \
-        BufferDownloadCommand,           \
-        BufferCopyCommand,               \
-        BufferToTextureCopyCommand,      \
-        ShaderDispatchCommand,           \
-        TextureUploadCommand,            \
-        TextureDownloadCommand,          \
-        TextureCopyCommand,              \
-        TextureToBufferCopyCommand,      \
-        AccelBuildCommand,               \
-        MeshBuildCommand,                \
-        CurveBuildCommand,               \
-        ProceduralPrimitiveBuildCommand, \
-        MotionInstanceBuildCommand,      \
-        BindlessArrayUpdateCommand,      \
-        CustomCommand
+    BufferUploadCommand,             \
+    BufferDownloadCommand,           \
+    BufferCopyCommand,               \
+    BufferToTextureCopyCommand,      \
+    ShaderDispatchCommand,           \
+    TextureUploadCommand,            \
+    TextureDownloadCommand,          \
+    TextureCopyCommand,              \
+    TextureToBufferCopyCommand,      \
+    AccelBuildCommand,               \
+    MeshBuildCommand,                \
+    CurveBuildCommand,               \
+    ProceduralPrimitiveBuildCommand, \
+    MotionInstanceBuildCommand,      \
+    BindlessArrayUpdateCommand,      \
+    CustomCommand
+// clang-format on
 
 #define LUISA_MAKE_COMMAND_FWD_DECL(CMD) class CMD;
 LUISA_MAP(LUISA_MAKE_COMMAND_FWD_DECL, LUISA_COMPUTE_RUNTIME_COMMANDS)

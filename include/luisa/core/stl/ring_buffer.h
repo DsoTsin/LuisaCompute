@@ -1,5 +1,7 @@
 #pragma once
 
+#ifndef LUISA_USE_SYSTEM_STL
+
 #include <EASTL/bonus/ring_buffer.h>
 #include <EASTL/bonus/fixed_ring_buffer.h>
 
@@ -13,3 +15,4 @@ using fixed_ring_buffer = eastl::fixed_ring_buffer<T, N>;
 
 }// namespace luisa
 
+#endif

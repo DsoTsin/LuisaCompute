@@ -137,7 +137,7 @@ void eliminate_instructions_in_unreachable_blocks(const luisa::unordered_set<Bas
         // replace the terminator with an unreachable instruction if it's not already
         if (!is_block_terminated_by_unreachable(b)) {
             b->terminator()->remove_self();
-            xir::Builder builder;
+            xir::XIRBuilder builder;
             builder.set_insertion_point(b);
             builder.unreachable_();
         }

@@ -33,17 +33,17 @@ public:
     }
     BinaryBlob &operator=(BinaryBlob const &rhs) noexcept = delete;
     BinaryBlob &operator=(BinaryBlob &&rhs) noexcept {
-        this->~BinaryBlob();
-        new (std::launder(this)) BinaryBlob{std::move(rhs)};
+        std::destroy_at(this);
+        std::construct_at(this, std::move(rhs));
         return *this;
     }
     ~BinaryBlob() noexcept {
         if (_disposer) { _disposer(_ptr); }
     }
-    [[nodiscard]] explicit operator luisa::span<const std::byte>() const noexcept {
+    [[nodiscard]] operator luisa::span<const std::byte>() const noexcept {
         return {_ptr, _size};
     }
-    [[nodiscard]] explicit operator luisa::span<std::byte>() noexcept {
+    [[nodiscard]] operator luisa::span<std::byte>() noexcept {
         return {_ptr, _size};
     }
     [[nodiscard]] std::byte const *data() const noexcept {
@@ -65,7 +65,7 @@ public:
     [[nodiscard]] virtual BinaryBlob read(size_t expected_max_size) noexcept {
         auto len = std::min(expected_max_size, length());
         BinaryBlob blob{
-            reinterpret_cast<std::byte *>(luisa::detail::allocator_allocate(len, 0)),
+            static_cast<std::byte *>(luisa::detail::allocator_allocate(len, 0)),
             len,
             [](void *ptr) { luisa::detail::allocator_deallocate(ptr, 0); }};
         read(blob);

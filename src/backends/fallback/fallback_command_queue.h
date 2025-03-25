@@ -8,7 +8,7 @@
 #include <luisa/core/stl/functional.h>
 #include <luisa/runtime/rhi/device_interface.h>
 
-#ifdef LUISA_COMPUTE_ENABLE_SYSTEM_PARALLEL_FOR
+#ifdef LUISA_COMPUTE_USE_SYSTEM_PARALLEL_FOR
 
 #if defined(LUISA_PLATFORM_APPLE)
 #define LUISA_FALLBACK_USE_DISPATCH_QUEUE

@@ -10,7 +10,7 @@ public:
     [[nodiscard]] Value *variable() noexcept;
     [[nodiscard]] const Value *variable() const noexcept;
     void set_variable(Value *variable) noexcept;
-    [[nodiscard]] LoadInst *clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept override;
+    [[nodiscard]] LoadInst *clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept override;
 };
 
 }// namespace luisa::compute::xir

@@ -66,10 +66,14 @@
 #endif
 #endif
 
+#ifdef LUISA_TENSOR_STATIC_LIB
+#define LC_TENSOR_API
+#else
 #ifdef LC_TENSOR_EXPORT_DLL
 #define LC_TENSOR_API __declspec(dllexport)
 #else
 #define LC_TENSOR_API __declspec(dllimport)
+#endif
 #endif
 
 #ifdef LC_OSL_EXPORT_DLL

@@ -769,13 +769,13 @@ ShaderCreationInfo CUDADevice::create_shader(const ShaderOption &option, Functio
         .argument_types = [kernel] {
             luisa::vector<luisa::string> types;
             types.reserve(kernel.arguments().size());
-            std::transform(kernel.arguments().cbegin(), kernel.arguments().cend(), std::back_inserter(types),
+            std::transform(kernel.arguments().begin(), kernel.arguments().end(), std::back_inserter(types),
                            [](auto &&arg) noexcept { return luisa::string{arg.type()->description()}; });
             return types; }(),
         .argument_usages = [kernel] {
             luisa::vector<Usage> usages;
             usages.reserve(kernel.arguments().size());
-            std::transform(kernel.arguments().cbegin(), kernel.arguments().cend(), std::back_inserter(usages),
+            std::transform(kernel.arguments().begin(), kernel.arguments().end(), std::back_inserter(usages),
                            [kernel](auto &&arg) noexcept { return kernel.variable_usage(arg.uid()); });
             return usages; }(),
         .format_types = [fmt = codegen.print_formats()] {
@@ -820,7 +820,7 @@ ShaderCreationInfo CUDADevice::load_shader(luisa::string_view name_in,
         .argument_types = [arg_types] {
             luisa::vector<luisa::string> types;
             types.reserve(arg_types.size());
-            std::transform(arg_types.cbegin(), arg_types.cend(), std::back_inserter(types),
+            std::transform(arg_types.begin(), arg_types.end(), std::back_inserter(types),
                            [](auto &&arg) noexcept { return luisa::string{arg->description()}; });
             return types; }(),
     };

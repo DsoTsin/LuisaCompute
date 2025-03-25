@@ -205,11 +205,11 @@ D3D12_RESOURCE_STATES ResourceStateTracker::ReadState(ResourceReadUsage usage, R
             D3D12_RESOURCE_STATE_COPY_SOURCE};
         switch (listType) {
             case D3D12_COMMAND_LIST_TYPE_COMPUTE:
-                return computeStates[eastl::to_underlying(usage)];
+                return computeStates[luisa::to_underlying(usage)];
             case D3D12_COMMAND_LIST_TYPE_COPY:
-                return copyStates[eastl::to_underlying(usage)];
+                return copyStates[luisa::to_underlying(usage)];
             default:
-                return graphicsStates[eastl::to_underlying(usage)];
+                return graphicsStates[luisa::to_underlying(usage)];
         }
     }
     LUISA_ERROR_WITH_LOCATION("Unreachable.");

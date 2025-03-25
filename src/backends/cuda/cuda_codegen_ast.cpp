@@ -60,7 +60,7 @@ public:
     struct FunctionResource {
         Function f;
         Variable v;
-        [[nodiscard]] auto operator==(const FunctionResource &rhs) const noexcept {
+        [[nodiscard]] auto operator==(const FunctionResource &rhs) const noexcept -> bool {
             return f.builder() == rhs.f.builder() && v.uid() == rhs.v.uid();
         }
         [[nodiscard]] auto hash() const noexcept {
@@ -70,7 +70,7 @@ public:
 
     struct FunctionResourceHash {
         using is_avalanching = void;
-        [[nodiscard]] auto operator()(const FunctionResource &x) const noexcept {
+        [[nodiscard]] auto operator()(const FunctionResource &x) const noexcept -> uint64_t {
             return x.hash();
         }
     };

@@ -79,6 +79,15 @@ void CommandBufferBuilder::DispatchCompute(
         calc(dispatchId.x, blk.x),
         calc(dispatchId.y, blk.y),
         calc(dispatchId.z, blk.z)};
+    if(dispId.x > 65535u) [[unlikely]]{
+        LUISA_ERROR("Dispatch size X {} out of range 65535", dispId.x);
+    }
+    if(dispId.y > 65535u) [[unlikely]]{
+        LUISA_ERROR("Dispatch size Y {} out of range 65535", dispId.y);
+    }
+    if(dispId.z > 65535u) [[unlikely]]{
+        LUISA_ERROR("Dispatch size Z {} out of range 65535", dispId.z);
+    }
     auto c = cb->cmdList.Get();
     c->SetComputeRootSignature(cs->RootSig());
     SetComputeResources(cs, resources);

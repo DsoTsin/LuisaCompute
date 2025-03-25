@@ -20,7 +20,7 @@ void StoreInst::set_value(Value *value) noexcept {
     set_operand(operand_index_value, value);
 }
 
-StoreInst *StoreInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+StoreInst *StoreInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_variable = resolver.resolve(variable());
     auto resolved_value = resolver.resolve(value());
     return b.store(resolved_variable, resolved_value);

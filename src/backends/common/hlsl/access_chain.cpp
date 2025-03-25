@@ -13,10 +13,10 @@ void AccessChain::init_name() {
     size_t basic_size = desc.size() + sizeof(CallOp);
     if (_root_var.is_shared()) {
         uint uid = _root_var.uid();
-        bin_vecs.push_back_uninitialized(basic_size + sizeof(uint));
+        luisa::enlarge_by(bin_vecs, basic_size + sizeof(uint));
         *reinterpret_cast<uint *>(bin_vecs.data() + basic_size) = uid;
     } else {
-        bin_vecs.push_back_uninitialized(basic_size);
+        luisa::enlarge_by(bin_vecs, basic_size);
     }
     auto ptr = bin_vecs.data();
     *reinterpret_cast<CallOp *>(ptr) = _op;
@@ -30,7 +30,7 @@ void AccessChain::init_name() {
             },
             [&](MemberNode const &m) {
                 auto last_size = bin_vecs.size();
-                bin_vecs.push_back_uninitialized(sizeof(size_t));
+                luisa::enlarge_by(bin_vecs, sizeof(size_t));
                 std::memcpy(bin_vecs.data() + last_size, &m.member_index, sizeof(size_t));
             });
     }

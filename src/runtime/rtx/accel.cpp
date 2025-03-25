@@ -73,7 +73,7 @@ luisa::unique_ptr<Command> Accel::_build(Accel::BuildRequest request,
         "Building acceleration structure without instances."); }
     // collect modifications
     luisa::vector<Accel::Modification> modifications;
-    modifications.push_back_uninitialized(_modifications.size());
+    luisa::enlarge_by(modifications, _modifications.size());
     luisa::transform(_modifications.cbegin(), _modifications.cend(), modifications.begin(),
                      [](auto &&pair) noexcept -> auto && { return pair.second; });
     _modifications.clear();

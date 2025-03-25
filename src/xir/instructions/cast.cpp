@@ -5,7 +5,7 @@
 namespace luisa::compute::xir {
 
 CastInst::CastInst(BasicBlock *parent_block, const Type *target_type, CastOp op, Value *value) noexcept
-    : Super{parent_block, target_type}, InstructionOpMixin{op} {
+    : Super{op, parent_block, target_type} {
     auto operands = std::array{value};
     set_operands(operands);
 }
@@ -22,7 +22,7 @@ void CastInst::set_value(Value *value) noexcept {
     set_operand(0, value);
 }
 
-CastInst *CastInst::clone(Builder &b, InstructionCloneValueResolver &resolver) const noexcept {
+CastInst *CastInst::clone(XIRBuilder &b, InstructionCloneValueResolver &resolver) const noexcept {
     auto resolved_value = resolver.resolve(value());
     return b.cast_(type(), op(), resolved_value);
 }

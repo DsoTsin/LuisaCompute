@@ -236,7 +236,7 @@ public:
     JSON(const char *s) noexcept : JSON{make_string(String{s})} {}
     JSON(Object o) noexcept : JSON{make_object(std::move(o))} {}
     JSON(Array a) noexcept : JSON{make_array(std::move(a))} {}
-    JSON(luisa::span<const JSON> a) noexcept : JSON{make_array(Array{a.cbegin(), a.cend()})} {}
+    JSON(luisa::span<const JSON> a) noexcept : JSON{make_array(Array{a.begin(), a.end()})} {}
     JSON(double n) noexcept : JSON{make_number(n)} {}
     JSON(float n) noexcept : JSON{make_number(n)} {}
     JSON(half n) noexcept : JSON{make_number(n)} {}
@@ -287,7 +287,7 @@ public:
         return *this;
     }
     JSON &operator=(luisa::span<const JSON> a) noexcept {
-        _copy(make_array(Array{a.cbegin(), a.cend()}));
+        _copy(make_array(Array{a.begin(), a.end()}));
         return *this;
     }
     JSON &operator=(double n) noexcept {
@@ -400,7 +400,11 @@ public:
 public:
     [[nodiscard]] decltype(auto) operator[](luisa::string_view key) noexcept {
         if (is_null()) { *this = make_object(); }
+#ifdef LUISA_USE_SYSTEM_STL
+        return as_object()[luisa::string{key}];
+#else
         return as_object()[key];
+#endif
     }
     [[nodiscard]] decltype(auto) operator[](size_t index) noexcept {
         if (is_null()) { *this = make_array(); }

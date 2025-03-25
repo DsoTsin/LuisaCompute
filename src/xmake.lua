@@ -33,3 +33,4 @@ end
 if get_config("enable_clangcxx") then
     includes("clangcxx")
 end
+-- includes("tensor")

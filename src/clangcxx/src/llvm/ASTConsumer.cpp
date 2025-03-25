@@ -710,6 +710,13 @@ struct ExprTranslator : public clang::RecursiveASTVisitor<ExprTranslator> {
                                     fb->assign(constructed, fb->call(lcType, MATRIX_LUT[N - 2], {lcArgs.begin() + 1, lcArgs.end()}));
                             } else
                                 clangcxx_log_error("???");
+                        } else if (builtinName == "half") {
+                            auto lcType = Type::of<half>();
+                            if ((*lcArgs.begin())->type() != Type::of<half>()) {
+                                fb->assign(constructed, fb->cast(Type::of<half>(), CastOp::STATIC, lcArgs.begin()[1]));
+                            } else {
+                                fb->assign(constructed, lcArgs.begin()[1]);
+                            }
                         } else if (builtinName == "array") {
                             if (auto TSD = llvm::dyn_cast<clang::ClassTemplateSpecializationDecl>(Ty->getAs<clang::RecordType>()->getDecl())) {
                                 auto &Arguments = TSD->getTemplateArgs();

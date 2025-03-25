@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
             pixels[pixel_pos * 4 + 3] = 255;
         }
     auto f = fopen("pixels.bytes", "wb");
-    fwrite(pixels.data(), pixels.size_bytes(), 1, f);
+    fwrite(pixels.data(), luisa::size_bytes(pixels), 1, f);
     fclose(f);
     {
         auto img = device.create_image<float>(PixelStorage::BYTE4, width, height / 2);
@@ -139,14 +139,14 @@ int main(int argc, char *argv[]) {
     {
         std::ofstream file{"test_dstorage_texture_compressed.gdeflate", std::ios::binary};
         file.write(reinterpret_cast<const char *>(compressed_pixels.data()),
-                   static_cast<ssize_t>(compressed_pixels.size_bytes()));
+                   static_cast<std::streamsize>(luisa::size_bytes(compressed_pixels)));
     }
-    LUISA_INFO("Texture compress time: {} ms, before compress size: {} bytes, after compress size: {} bytes", compress_time, pixels.size_bytes(), compressed_pixels.size_bytes());
+    LUISA_INFO("Texture compress time: {} ms, before compress size: {} bytes, after compress size: {} bytes", compress_time, luisa::size_bytes(pixels), luisa::size_bytes(compressed_pixels));
     {
         Image<float> img = device.create_image<float>(PixelStorage::BYTE4, width, height / 2);
         luisa::vector<std::byte> out_pixels(width * height * 4u / 2);
         Clock decompress_clock{};
-        DStorageFile pinned_pixels = dstorage_ext->pin_memory(compressed_pixels.data(), compressed_pixels.size_bytes());
+        DStorageFile pinned_pixels = dstorage_ext->pin_memory(compressed_pixels.data(), luisa::size_bytes(compressed_pixels));
         dstorage_memory_stream << pinned_pixels.copy_to(img, compression)
                                << synchronize();
         double decompress_time = decompress_clock.toc();
