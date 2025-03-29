@@ -18,6 +18,36 @@ using namespace luisa::compute;
 
 namespace luisa::test {
 
+bool test_shader_mat(Device& device) {
+    auto m = make_float2x2(1.f, 2.f, 3.f, 4.f);
+    float3x3 m_shader;
+    Buffer<float3x3> buf = device.create_buffer<float3x3>(1);
+    Kernel1D k1 = [&] {
+        Float3x3 R;
+        R[0][0] = 0;
+        R[0][1] = 1;
+        R[0][2] = 2;
+        R[1][0] = 3;
+        R[1][1] = 4;
+        R[1][2] = 5;
+        R[2][0] = 6;
+        R[2][1] = 7;
+        R[2][2] = 8;
+        buf->write(0, R * transpose(R));
+    };
+    auto s = device.compile(k1);
+    Stream stream = device.create_stream();
+    stream << s().dispatch(1u);
+    stream << synchronize();
+
+    stream << buf.copy_to(&m_shader);
+    stream << synchronize();
+
+    LUISA_INFO("{}", m_shader);
+    return true;
+}
+
+
 int test_matrix2x2(Device &device) {
     auto m = make_float2x2(1.f, 2.f, 3.f, 4.f);
     // Matrix in LC is col-first order
@@ -77,4 +107,5 @@ int test_matrix2x2(Device &device) {
 
 TEST_SUITE("runtime") {
     LUISA_TEST_CASE_WITH_DEVICE("dsl_matrix_float2x2", luisa::test::test_matrix2x2(device) == 0);
+    LUISA_TEST_CASE_WITH_DEVICE("dsl_shader_mat", luisa::test::test_shader_mat(device));
 }
