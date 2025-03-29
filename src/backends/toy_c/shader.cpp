@@ -3,8 +3,8 @@
 #include "memory_manager.h"
 namespace lc::toy_c {
 LCShader::LCShader(DynamicModule &dyn_module, luisa::span<const Type *const> arg_types, luisa::string_view kernel_name) {
-    kernel = dyn_module.function<void(uint3 thd_id, uint3 blk_id, uint3 dsp_id, uint3 dsp_size, uint3 ker_id, void *args)>(kernel_name);
     vstd::string md5_name{kernel_name};
+    kernel = dyn_module.function<void(uint3 thd_id, uint3 blk_id, uint3 dsp_id, uint3 dsp_size, uint3 ker_id, void *args)>(md5_name.c_str());
     md5_name += "_args_md5_c4434d750cf64f0eae3f73cca8650b16";
 
     vstd::string block_name{kernel_name};
@@ -12,7 +12,7 @@ LCShader::LCShader(DynamicModule &dyn_module, luisa::span<const Type *const> arg
 
     vstd::string usage_name{kernel_name};
     usage_name += "_arg_usage_c4434d750cf64f0eae3f73cca8650b16";
-    auto md5_value = dyn_module.invoke<ulong2()>(md5_name);
+    auto md5_value = dyn_module.invoke<ulong2()>(md5_name.c_str());
     luisa::vector<char> arg_decs;
     arg_decs.reserve(1024);
     for (auto &i : arg_types) {
@@ -25,8 +25,8 @@ LCShader::LCShader(DynamicModule &dyn_module, luisa::span<const Type *const> arg
         LUISA_ERROR("LCShader type validation mismatch.");
     }
 
-    block_size = dyn_module.invoke<uint3()>(block_name);
-    get_usage = dyn_module.function<uint32_t(uint32_t)>(usage_name);
+    block_size = dyn_module.invoke<uint3()>(block_name.c_str());
+    get_usage = dyn_module.function<uint32_t(uint32_t)>(usage_name.c_str());
 }
 LCShader::~LCShader() {}
 void LCShader::_emplace_arg(luisa::span<const Argument> arguments, std::byte const *uniform_data, luisa::vector<std::byte> &arg_buffer) {

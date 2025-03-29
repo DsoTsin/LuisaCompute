@@ -43,37 +43,24 @@ ScopeExpr::~ScopeExpr() noexcept {
     }
 }
 
-SetValueExpr::SetValueExpr(
-    uint64_t idx,
-    TensorData *tensor_data,
-    Type type,
-    uint32_t value) noexcept
-    : BaseClass(idx),
-      tensor_data(tensor_data),
-      type(type),
-      value(value) {
-}
-
 GEMMExpr::GEMMExpr(
     uint64_t idx,
     TensorData *lhs_tensor,
     TensorData *rhs_tensor,
     FusedActivation const &fused_activation,
-    uint group_count,
     TensorElementType out_type) noexcept
     : BaseClass(idx),
       lhs_tensor(lhs_tensor),
       rhs_tensor(rhs_tensor),
-      fused_activation(fused_activation),
-      group_count(group_count) {
+      fused_activation(fused_activation) {
     ulong2 desire_out_size;
     desire_out_size.x = rhs_tensor->get_size(0);
     desire_out_size.y = std::max(rhs_tensor->get_size(1), lhs_tensor->get_size(0));
-    if (lhs_tensor->get_size(2) != group_count ||
-        rhs_tensor->get_size(2) != group_count) [[unlikely]] {
+    auto group_size = lhs_tensor->get_size(2);
+    if (rhs_tensor->get_size(2) != group_size) [[unlikely]] {
         LUISA_ERROR("GEMM matrix group-batch size mismatch");
     }
-    auto sizes = {(size_t)desire_out_size.x, (size_t)desire_out_size.y, (size_t)group_count};
+    auto sizes = {(size_t)desire_out_size.x, (size_t)desire_out_size.y, (size_t)group_size};
     output_tensor = TensorBuilder::get_thd_local()->allocate_tensor(sizes, out_type);
 }
 
@@ -81,6 +68,7 @@ ConvExpr::ConvExpr(
     uint64_t idx,
     TensorData *input_tensor,
     TensorData *weight_tensor,
+    FusedActivation const &fused_activation,
     luisa::span<uint const> filter_size,
     luisa::span<uint const> dilation,
     luisa::span<uint const> start_paddings,
@@ -88,7 +76,8 @@ ConvExpr::ConvExpr(
     TensorElementType out_type) noexcept
     : BaseClass(idx),
       input_tensor(input_tensor),
-      weight_tensor(weight_tensor) {
+      weight_tensor(weight_tensor),
+      fused_activation(fused_activation) {
     auto dim = dimension();
     if (dilation.size() != dim ||
         start_paddings.size() != dim ||
@@ -117,7 +106,9 @@ ConvExpr::ConvExpr(
         if (input_size < 2 * filter_size[i]) [[unlikely]] {
             LUISA_ERROR("Input + padding size must be larger than filter_size");
         }
-        out_tensor_sizes.emplace_back(input_size - 2 * filter_size[i]);
+        auto out_size = input_size - 2 * filter_size[i];
+        out_size = (out_size + dilation[i] - 1) / dilation[i];
+        out_tensor_sizes.emplace_back(out_size);
     }
     out_tensor_sizes.emplace_back(weight_tensor->get_size(1));
     out_tensor = TensorBuilder::get_thd_local()->allocate_tensor(out_tensor_sizes, out_type);
@@ -133,4 +124,83 @@ TestExpr::TestExpr(
       output(output),
       name(name) {
 }
+
+
+Tensor Tensor::gemm(
+    Tensor const &lhs,
+    Tensor const &rhs,
+    FusedActivation const &activation,
+    TensorElementType out_type) noexcept {
+    auto expr = TensorBuilder::get_thd_local()->current_scope()->allocate_expr<GEMMExpr>(
+        lhs.data(),
+        rhs.data(),
+        activation,
+        out_type);
+    return Tensor{expr->output_tensor, true};
+}
+
+Tensor Tensor::conv_1d(
+    Tensor const &input,
+    Tensor const &weight,
+    FusedActivation const &activation,
+    TensorElementType out_type,
+    uint filter_radius,
+    uint dilation,
+    uint start_padding,
+    uint end_padding) noexcept {
+
+    auto expr = TensorBuilder::get_thd_local()->current_scope()->allocate_expr<ConvExpr>(
+        input.data(),
+        weight.data(),
+        activation,
+        luisa::span<uint const>{&filter_radius, 1},
+        luisa::span<uint const>{&dilation, 1},
+        luisa::span<uint const>{&start_padding, 1},
+        luisa::span<uint const>{&end_padding, 1},
+        out_type);
+    return Tensor{expr->out_tensor, true};
+}
+
+Tensor Tensor::conv_2d(
+    Tensor const &input,
+    Tensor const &weight,
+    FusedActivation const &activation,
+    TensorElementType out_type,
+    uint2 filter_radius,
+    uint2 dilation,
+    uint2 start_padding,
+    uint2 end_padding) noexcept {
+    auto expr = TensorBuilder::get_thd_local()->current_scope()->allocate_expr<ConvExpr>(
+        input.data(),
+        weight.data(),
+        activation,
+        luisa::span<uint const>{reinterpret_cast<uint *>(&filter_radius), 2},
+        luisa::span<uint const>{reinterpret_cast<uint *>(&dilation), 2},
+        luisa::span<uint const>{reinterpret_cast<uint *>(&start_padding), 2},
+        luisa::span<uint const>{reinterpret_cast<uint *>(&end_padding), 2},
+        out_type);
+    return Tensor{expr->out_tensor, true};
+}
+
+Tensor Tensor::conv_3d(
+    Tensor const &input,
+    Tensor const &weight,
+    FusedActivation const &activation,
+    TensorElementType out_type,
+    uint3 filter_radius,
+    uint3 dilation,
+    uint3 start_padding,
+    uint3 end_padding) noexcept {
+    auto expr = TensorBuilder::get_thd_local()->current_scope()->allocate_expr<ConvExpr>(
+        input.data(),
+        weight.data(),
+        activation,
+        luisa::span<uint const>{reinterpret_cast<uint *>(&filter_radius), 3},
+        luisa::span<uint const>{reinterpret_cast<uint *>(&dilation), 3},
+        luisa::span<uint const>{reinterpret_cast<uint *>(&start_padding), 3},
+        luisa::span<uint const>{reinterpret_cast<uint *>(&end_padding), 3},
+        out_type);
+    return Tensor{expr->out_tensor, true};
+}
+
 }// namespace luisa::compute

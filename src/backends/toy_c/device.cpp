@@ -34,7 +34,7 @@ public:
                 LUISA_ERROR("Dynamic module {} not found.", module_name);
             }
             auto func_name = ext->set_func_table_name();
-            vstd::func_ptr_t<ToyCDeviceConfig::FuncTable *(void *)> set_functable = dyn_module.function<ToyCDeviceConfig::FuncTable *(void *)>(func_name);
+            vstd::func_ptr_t<ToyCDeviceConfig::FuncTable *(void *)> set_functable = dyn_module.function<ToyCDeviceConfig::FuncTable *(void *)>(func_name.c_str());
             if (!set_functable) [[unlikely]] {
                 LUISA_ERROR("{} not found.", func_name);
             }

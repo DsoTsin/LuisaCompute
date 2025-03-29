@@ -140,6 +140,7 @@ public:
     [[nodiscard]] auto view(size_t offset, size_t count) const noexcept {
         return view().subview(offset, count);
     }
+#ifndef LUISA_ENABLE_SAFE_MODE
     // commands
     // copy buffer's data to pointer
     [[nodiscard]] auto copy_to(void *data) const noexcept {
@@ -168,6 +169,7 @@ public:
     [[nodiscard]] auto copy_from(const ByteBufferView &source) const noexcept {
         return this->view().copy_from(source);
     }
+#endif
     // DSL interface
     [[nodiscard]] auto operator->() const noexcept {
         _check_is_valid();

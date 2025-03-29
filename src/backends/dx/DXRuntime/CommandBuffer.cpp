@@ -79,14 +79,14 @@ void CommandBufferBuilder::DispatchCompute(
         calc(dispatchId.x, blk.x),
         calc(dispatchId.y, blk.y),
         calc(dispatchId.z, blk.z)};
-    if(dispId.x > 65535u) [[unlikely]]{
-        LUISA_ERROR("Dispatch size X {} out of range 65535", dispId.x);
+    if(dispId.x > D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION) [[unlikely]]{
+        LUISA_ERROR("Dispatch size X {} out of range {}", dispId.x, D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION);
     }
-    if(dispId.y > 65535u) [[unlikely]]{
-        LUISA_ERROR("Dispatch size Y {} out of range 65535", dispId.y);
+    if(dispId.y > D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION) [[unlikely]]{
+        LUISA_ERROR("Dispatch size Y {} out of range {}", dispId.y, D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION);
     }
-    if(dispId.z > 65535u) [[unlikely]]{
-        LUISA_ERROR("Dispatch size Z {} out of range 65535", dispId.z);
+    if(dispId.z > D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION) [[unlikely]]{
+        LUISA_ERROR("Dispatch size Z {} out of range {}", dispId.z, D3D12_CS_DISPATCH_MAX_THREAD_GROUPS_PER_DIMENSION);
     }
     auto c = cb->cmdList.Get();
     c->SetComputeRootSignature(cs->RootSig());

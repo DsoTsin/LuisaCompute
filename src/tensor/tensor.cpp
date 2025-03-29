@@ -71,8 +71,19 @@ TensorData *TensorBuilder::allocate_tensor(
     _allocated_tensor.emplace_back(ptr);
     return ptr;
 }
-TensorBuilder::TensorBuilder() noexcept : _root_expr(~0ull) {}
+TensorBuilder::TensorBuilder() noexcept : _root_expr(~0ull) {
+    _expr_stack.emplace_back(&_root_expr);
+}
+void TensorBuilder::push_scope() noexcept {
+    auto last = _expr_stack.back();
+     _expr_stack.emplace_back(last->allocate_expr<ScopeExpr>());
+}
+void TensorBuilder::pop_scope() noexcept {
+    LUISA_ASSERT(_expr_stack.size() > 1, "Invalid scope pop.");
+    _expr_stack.pop_back();
+}
 TensorBuilder::~TensorBuilder() noexcept {
+    LUISA_ASSERT(_expr_stack.size() == 1, "Un-poped scope lefted.");
 }
 void *TensorBuilder::allocate_stack(size_t size_bytes, size_t alignment) noexcept {
     for (auto &i : _stack_allocator) {

@@ -251,7 +251,7 @@ void CodegenVisitor::visit(const CallExpr *expr) {
             utils.get_type_name(sb, args[0]->type());
             sb << "*)&";
             args[0]->accept(*this);
-            sb << ", ";
+            sb << ", &";
             args[1]->accept(*this);
             sb << ", ";
             args[2]->accept(*this);

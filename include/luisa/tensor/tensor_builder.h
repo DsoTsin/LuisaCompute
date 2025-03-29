@@ -8,13 +8,14 @@ class LC_TENSOR_API TensorBuilder {
 
     luisa::Pool<TensorData, false, false> _tensor_pool;
     luisa::vector<TensorData *> _allocated_tensor;
+    luisa::vector<ScopeExpr *> _expr_stack;
     ScopeExpr _root_expr;
     struct Stack {
         luisa::unique_ptr<std::byte> ptr;
         size_t size;
         size_t offset;
         Stack(
-            std::byte* ptr,
+            std::byte *ptr,
             size_t size,
             size_t offset) noexcept
             : ptr(ptr), size(size), offset(offset) {}
@@ -27,22 +28,20 @@ public:
     [[nodiscard]] luisa::span<TensorData *const> allocated_tensor() const noexcept {
         return {_allocated_tensor};
     }
-    [[nodiscard]] auto &root_expr() noexcept { return _root_expr; }
+    [[nodiscard]] auto current_scope() noexcept { return _expr_stack.back(); }
     static void set_thd_local(TensorBuilder *builder);
     static TensorBuilder *get_thd_local();
     void *allocate_stack(size_t size_bytes, size_t alignment = 8) noexcept;
     template<typename T>
         requires(std::is_trivially_destructible_v<T>)
-    T *allocate_array(size_t size) {
+    T *allocate_array(size_t size) noexcept {
         return std::launder(reinterpret_cast<T *>(allocate_stack(size * sizeof(T), alignof(T))));
     }
     TensorData *allocate_tensor(
         luisa::span<size_t const> sizes,
         TensorElementType element_type) noexcept;
-    template<typename T, typename... Args>
-        requires(std::is_base_of_v<TensorExpr, T> && std::is_trivially_destructible_v<T> && luisa::is_constructible_v<T, uint64_t, Args && ...>)
-    T *allocate_expr(Args &&...args) {
-    }
+    void push_scope() noexcept;
+    void pop_scope() noexcept;
     TensorBuilder() noexcept;
     ~TensorBuilder() noexcept;
     TensorBuilder(TensorBuilder const &) = delete;

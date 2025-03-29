@@ -1440,7 +1440,8 @@ void Clanguage_CodegenUtils::codegen(
     sb << " void " << entry_name << "(uint32_t3 thd_id, uint32_t3 blk_id, uint32_t3 dsp_id, uint32_t3 dsp_size, uint32_t3 ker_id, Args* args){\nbuiltin_c4434d750cf64f0eae3f73cca8650b16(thd_id, blk_id, dsp_id, dsp_size, ker_id";
     arg_idx = 0;
     for (auto &i : func.arguments()) {
-        sb << ", args->a" << luisa::format("{}", arg_idx);
+        
+        sb << (i.is_reference() ? ", &args->a" : ", args->a") << luisa::format("{}", arg_idx);
         arg_idx++;
     }
     sb << ");\n}\n";

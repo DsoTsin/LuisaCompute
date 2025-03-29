@@ -8,6 +8,7 @@ namespace luisa::compute {
 #define LUISA_COMPUTE_TENSOR_EXPRRESSIONS \
     ScopeExpr,                          \
     SetValueExpr,                       \
+    LCGRandExpr,                        \
     GEMMExpr,                           \
     ConvExpr,                           \
     TestExpr
@@ -83,25 +84,35 @@ public:
         }
     }
 };
-class LC_TENSOR_API LUISA_TENSOR_EXPR_CLASS_INHERIT(SetValueExpr) {
+class LUISA_TENSOR_EXPR_CLASS_INHERIT(SetValueExpr) {
 public:
-    enum class Type {
-        ConstValue,
-        Lcg1D,
-        Lcg2D,
-        Lcg3D,
-        Hammersley2D,
-        Halton,
-        Sobol,
-    };
     TensorData *tensor_data;
-    Type type;
     uint value;
     SetValueExpr(
         uint64_t idx,
         TensorData *tensor_data,
-        Type type,
-        uint32_t value) noexcept;
+        uint32_t value) noexcept
+        : BaseClass(idx),
+          tensor_data(tensor_data),
+          value(value) {}
+    void get_tensors(vstd::FuncRef<void(TensorData *, Usage usage)> callback) noexcept override {
+        callback(tensor_data, Usage::WRITE);
+    }
+};
+class LUISA_TENSOR_EXPR_CLASS_INHERIT(LCGRandExpr) {
+public:
+    TensorData *tensor_data;
+    uint64_t group_size;
+    uint seed;
+    LCGRandExpr(
+        uint64_t idx,
+        TensorData *tensor_data,
+        uint64_t group_size,
+        uint seed) noexcept
+        : BaseClass(idx),
+          tensor_data(tensor_data),
+          group_size(group_size),
+          seed(seed) {}
     void get_tensors(vstd::FuncRef<void(TensorData *, Usage usage)> callback) noexcept override {
         callback(tensor_data, Usage::WRITE);
     }
@@ -112,13 +123,11 @@ public:
     TensorData *rhs_tensor;
     TensorData *output_tensor;
     FusedActivation fused_activation;
-    uint group_count;
     GEMMExpr(
         uint64_t idx,
         TensorData *lhs_tensor,
         TensorData *rhs_tensor,
         FusedActivation const &fused_activation,
-        uint group_count,
         TensorElementType out_type) noexcept;
     void get_tensors(vstd::FuncRef<void(TensorData *, Usage usage)> callback) noexcept override {
         callback(lhs_tensor, Usage::READ);
@@ -132,6 +141,7 @@ public:
     TensorData *input_tensor;
     TensorData *weight_tensor;
     TensorData *out_tensor;
+    FusedActivation fused_activation;
     luisa::fixed_vector<uint, 3> filter_size;
     luisa::fixed_vector<uint, 3> dilation;
     luisa::fixed_vector<uint, 3> start_paddings;
@@ -145,6 +155,7 @@ public:
         uint64_t idx,
         TensorData *input_tensor,
         TensorData *weight_tensor,
+        FusedActivation const &fused_activation,
         luisa::span<uint const> filter_size,
         luisa::span<uint const> dilation,
         luisa::span<uint const> start_paddings,

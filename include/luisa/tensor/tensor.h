@@ -4,6 +4,7 @@
 #include <luisa/core/pool.h>
 #include <luisa/runtime/buffer.h>
 #include <luisa/runtime/byte_buffer.h>
+#include <luisa/tensor/fused_activation.h>
 namespace luisa::compute {
 
 enum struct TensorElementType : uint8_t {
@@ -50,11 +51,10 @@ class LC_TENSOR_API Tensor {
 
     TensorData *_data;
     bool _contained;
-    Tensor(TensorData *data,
-           bool contained) noexcept;
 
 public:
-    explicit Tensor(TensorData *data) noexcept : Tensor(data, false) {}
+    Tensor(TensorData *data,
+           bool contained = true) noexcept;
     Tensor(Tensor &&rhs) noexcept;
     ~Tensor() noexcept;
     Tensor &operator=(Tensor &&rhs) noexcept {
@@ -66,11 +66,44 @@ public:
     [[nodiscard]] auto data() const noexcept { return _data; }
     void dispose() noexcept;
 
-    // TODO: arithmetic
-    // Tensor operator*(Tensor const &rhs) const noexcept;
-    // Tensor &operator*=(Tensor const &rhs) noexcept;
-    // Tensor operator+(Tensor const &rhs) const noexcept;
-    // Tensor &operator+=(Tensor const &rhs) noexcept;
+    [[nodiscard]] static Tensor one(TensorElementType element_type, luisa::span<const size_t> sizes) noexcept;
+    [[nodiscard]] static Tensor zero(TensorElementType element_type, luisa::span<const size_t> sizes) noexcept;
+
+    [[nodiscard]] static Tensor gemm(
+        Tensor const &lhs,
+        Tensor const &rhs,
+        FusedActivation const &activation,
+        TensorElementType out_type) noexcept;
+
+    [[nodiscard]] static Tensor conv_1d(
+        Tensor const &input,
+        Tensor const &weight,
+        FusedActivation const &activation,
+        TensorElementType out_type,
+        uint filter_radius,
+        uint dilation,
+        uint start_padding = std::numeric_limits<uint>::max(),
+        uint end_padding = std::numeric_limits<uint>::max()) noexcept;
+
+    [[nodiscard]] static Tensor conv_2d(
+        Tensor const &input,
+        Tensor const &weight,
+        FusedActivation const &activation,
+        TensorElementType out_type,
+        uint2 filter_radius,
+        uint2 dilation,
+        uint2 start_padding = uint2(std::numeric_limits<uint>::max()),
+        uint2 end_padding = uint2(std::numeric_limits<uint>::max())) noexcept;
+
+    [[nodiscard]] static Tensor conv_3d(
+        Tensor const &input,
+        Tensor const &weight,
+        FusedActivation const &activation,
+        TensorElementType out_type,
+        uint3 filter_radius,
+        uint3 dilation,
+        uint3 start_padding = uint3(std::numeric_limits<uint>::max()),
+        uint3 end_padding = uint3(std::numeric_limits<uint>::max())) noexcept;
 };
 
 // class DTensor {
